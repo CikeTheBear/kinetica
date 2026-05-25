@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { requireUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { BottomNav } from '@/components/bottom-nav';
@@ -19,10 +20,14 @@ export default async function DashboardLayout({
     .from('user_profiles')
     .select('disclaimer_accepted_at, onboarding_completed')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  // Si no ha aceptado el disclaimer, redirigir a la página bloqueante
-  if (!profile?.disclaimer_accepted_at) {
+  // Evitar loop: solo redirigir si NO estamos ya en /disclaimer
+  const headersList = headers();
+  const pathname = headersList.get('x-invoke-path') || '';
+  const isOnDisclaimer = pathname.includes('/disclaimer');
+
+  if (!isOnDisclaimer && !profile?.disclaimer_accepted_at) {
     redirect(`/${locale}/disclaimer`);
   }
 
