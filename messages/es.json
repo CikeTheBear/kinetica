@@ -32,5 +32,12 @@
     "title": "Coach Kai",
     "placeholder": "Escribe un mensaje...",
     "emptyState": "Aquí hablarás con Kai, tu coach personal."
+  },
+  "disclaimer": {
+    "title": "Aviso médico importante",
+    "acceptCheckbox": "He leído y acepto el aviso médico",
+    "acceptButton": "Acepto y continúo",
+    "scrollToRead": "Desplázate para leer todo el contenido",
+    "footerLink": "Aviso médico"
   }
 }

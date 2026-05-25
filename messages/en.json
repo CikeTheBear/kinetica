@@ -32,5 +32,12 @@
     "title": "Coach Kai",
     "placeholder": "Type a message...",
     "emptyState": "You'll chat with Kai, your personal coach, here."
+  },
+  "disclaimer": {
+    "title": "Important medical notice",
+    "acceptCheckbox": "I have read and accept the medical notice",
+    "acceptButton": "I accept and continue",
+    "scrollToRead": "Scroll to read all the content",
+    "footerLink": "Medical notice"
   }
 }

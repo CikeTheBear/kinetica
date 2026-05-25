@@ -21,25 +21,18 @@
 
 ---
 
-## ⏳ Fase 2 — Deploy en Vercel (SIGUIENTE PASO)
+## ✅ Fase 2 — Deploy en Vercel (COMPLETADA)
 
 ### GitHub
-- [ ] Crear repo en GitHub y hacer push del código.
-- [ ] Verificar que no se subió `.env.local`.
+- [x] Crear repo en GitHub y hacer push del código.
+- [x] Verificar que no se subió `.env.local`.
 
 ### Vercel
-- [ ] Crear proyecto en [vercel.com](https://vercel.com) conectado al repo de GitHub.
-- [ ] En Settings → Environment Variables, agregar:
-  ```
-  NEXT_PUBLIC_APP_URL=https://kinetica.app (o tu dominio)
-  NEXT_PUBLIC_SUPABASE_URL=https://focbdmounzgaujtirvno.supabase.co
-  NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
-  NEXT_PUBLIC_DEFAULT_LOCALE=es
-  OPENROUTER_API_KEY=sk-or-v1-...
-  OPENROUTER_DEFAULT_MODEL=google/gemini-3-flash-preview
-  OPENROUTER_FALLBACK_MODEL=openai/gpt-4o
-  ```
-- [ ] Deployar y probar registro → login → Coach en la URL de Vercel.
+- [x] Crear proyecto en [vercel.com](https://vercel.com) conectado al repo de GitHub.
+- [x] Agregar todas las environment variables.
+- [x] Deployar y probar registro → login → Coach en la URL de Vercel.
+
+**URL de producción:** https://kinetica-delta.vercel.app
 
 ---
 
@@ -87,15 +80,16 @@
 
 | Componente | Estado |
 |---|---|
-| Registro/Login con Supabase Auth | ✅ Funciona |
-| Chat con Kai (SSE streaming) | ✅ Funciona |
+| Registro/Login con Supabase Auth | ✅ Funciona local y producción |
+| Chat con Kai (SSE streaming) | ✅ Funciona local y producción |
 | Onboarding conversacional | ✅ Funciona (Kai pide datos) |
 | Markdown renderer | ✅ Funciona (negritas, listas, tablas, etc.) |
 | Bloques especiales de Kai (plan-card, alert, chart) | ✅ Parseados |
 | Memoria Capa 1 (contexto usuario) | ✅ Implementada |
 | Memoria Capa 2 (últimos 20 mensajes) | ✅ Implementada |
 | Tool `update_user_profile` | ✅ Implementada |
-| Deploy en producción (Vercel) | ⏳ Pendiente |
+| Deploy en producción (Vercel) | ✅ https://kinetica-delta.vercel.app |
+| PWA en móvil | ✅ Probado y funcionando |
 | Integración con wger.de (ejercicios) | ⏳ Sprint 3 |
 | Generación de planes semanales | ⏳ Sprint 3 |
 | Web Push notifications | ⏳ Sprint 6 |

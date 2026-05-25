@@ -1,4 +1,6 @@
+import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 import { BottomNav } from '@/components/bottom-nav';
 import { UserMenu } from '@/components/auth/user-menu';
 
@@ -9,8 +11,25 @@ export default async function DashboardLayout({
   children: React.ReactNode;
   params: { locale: string };
 }) {
-  // Solo protege autenticación. El onboarding se maneja por página.
   const user = await requireUser(locale);
+
+  // Verificar disclaimer antes de cualquier otra cosa
+  const supabase = createClient();
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('disclaimer_accepted_at, onboarding_completed')
+    .eq('id', user.id)
+    .single();
+
+  // Si no ha aceptado el disclaimer, redirigir a la página bloqueante
+  if (!profile?.disclaimer_accepted_at) {
+    redirect(`/${locale}/disclaimer`);
+  }
+
+  // Solo después del disclaimer, verificar onboarding
+  if (!profile?.onboarding_completed) {
+    redirect(`/${locale}/coach?onboarding=true`);
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">
