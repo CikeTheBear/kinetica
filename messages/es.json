@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "title": "Kinética — Coach de entrenamiento con IA",
+    "description": "Tu entrenador personal inteligente. Planes, seguimiento y coach virtual Kai."
+  },
+  "navigation": {
+    "dashboard": "Inicio",
+    "plan": "Plan",
+    "coach": "Coach"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "register": "Crear cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "loginButton": "Entrar",
+    "registerButton": "Crear cuenta",
+    "noAccount": "¿No tienes cuenta?",
+    "hasAccount": "¿Ya tienes cuenta?",
+    "logout": "Cerrar sesión"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Hola",
+    "emptyState": "Aún no hay datos. Completa tu onboarding con Kai."
+  },
+  "plan": {
+    "title": "Plan semanal",
+    "emptyState": "No tienes un plan activo. Pídele a Kai que te genere uno."
+  },
+  "coach": {
+    "title": "Coach Kai",
+    "placeholder": "Escribe un mensaje...",
+    "emptyState": "Aquí hablarás con Kai, tu coach personal."
+  }
+}

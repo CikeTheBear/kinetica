@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "title": "Kinética — AI-powered fitness coach",
+    "description": "Your intelligent personal trainer. Plans, tracking and virtual coach Kai."
+  },
+  "navigation": {
+    "dashboard": "Home",
+    "plan": "Plan",
+    "coach": "Coach"
+  },
+  "auth": {
+    "login": "Log in",
+    "register": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "loginButton": "Log in",
+    "registerButton": "Create account",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "logout": "Log out"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Hello",
+    "emptyState": "No data yet. Complete your onboarding with Kai."
+  },
+  "plan": {
+    "title": "Weekly plan",
+    "emptyState": "You don't have an active plan. Ask Kai to generate one."
+  },
+  "coach": {
+    "title": "Coach Kai",
+    "placeholder": "Type a message...",
+    "emptyState": "You'll chat with Kai, your personal coach, here."
+  }
+}
