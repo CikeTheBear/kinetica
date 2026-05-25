@@ -27,6 +27,25 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'generate_weekly_plan',
+      description:
+        'Genera un plan semanal completo de entrenamiento. Usar cuando el usuario pide un nuevo plan, al inicio de semana, o cuando hay cambios significativos (nueva lesión, cambio de objetivo, etc.).',
+      parameters: {
+        type: 'object',
+        properties: {
+          confirmacion: {
+            type: 'boolean',
+            description:
+              'Debe ser true. El usuario debe confirmar explícitamente que quiere generar un nuevo plan.',
+          },
+        },
+        required: ['confirmacion'],
+      },
+    },
+  },
 ];
 
 /**
@@ -41,6 +60,9 @@ export async function executeTool(
     case 'update_user_profile': {
       const a = args as { field: string; value: string };
       return updateUserProfile(a, userId);
+    }
+    case 'generate_weekly_plan': {
+      return generateWeeklyPlan(userId);
     }
     default:
       return `Tool desconocida: ${toolName}`;
@@ -85,4 +107,28 @@ async function updateUserProfile(
   }
 
   return `Perfil actualizado: ${args.field} = ${args.value}`;
+}
+
+async function generateWeeklyPlan(userId: string): Promise<string> {
+  try {
+    // Como estamos en el servidor, hacemos una petición interna
+    // En producción esto debería ser una llamada directa a la función,
+    // pero para simplificar usamos fetch al endpoint local
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    const response = await fetch(`${appUrl}/api/plan/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return `Error generando plan: ${error.error || response.statusText}`;
+    }
+
+    const data = await response.json();
+    return `Plan semanal generado correctamente para la semana del ${data.plan.semana_inicio}.`;
+  } catch (error) {
+    return `Error generando plan: ${(error as Error).message}`;
+  }
 }

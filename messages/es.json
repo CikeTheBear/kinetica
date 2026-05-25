@@ -26,7 +26,12 @@
   },
   "plan": {
     "title": "Plan semanal",
-    "emptyState": "No tienes un plan activo. Pídele a Kai que te genere uno."
+    "emptyState": "No tienes un plan activo. Pídele a Kai que te genere uno.",
+    "loading": "Cargando plan...",
+    "generateButton": "Generar plan",
+    "regenerateButton": "Regenerar",
+    "noPlanTitle": "Sin plan activo",
+    "noPlanDescription": "Kai aún no ha generado tu plan semanal. Empieza conversando con él o genera uno ahora."
   },
   "coach": {
     "title": "Coach Kai",
