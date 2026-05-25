@@ -55,7 +55,7 @@ export async function signUp(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/login');
+  redirect('/es/login');
 }
 
 /**
@@ -81,7 +81,8 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/dashboard');
+  // Redirigir directo a /es/coach para evitar chain de redirects (dashboard → coach)
+  redirect('/es/coach');
 }
 
 /**

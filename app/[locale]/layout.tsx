@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-import { ServiceWorkerRegister } from '@/components/service-worker-register';
+// import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import './../globals.css';
 
 const inter = Inter({
@@ -54,7 +54,8 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages} locale={locale}>
           {children}
         </NextIntlClientProvider>
-        <ServiceWorkerRegister />
+        {/* ServiceWorkerRegister desactivado temporalmente para evitar cache loops */}
+        {/* <ServiceWorkerRegister /> */}
       </body>
     </html>
   );
