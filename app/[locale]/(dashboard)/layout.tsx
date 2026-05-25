@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
 import { requireUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
 import { BottomNav } from '@/components/bottom-nav';
@@ -14,24 +13,14 @@ export default async function DashboardLayout({
 }) {
   const user = await requireUser(locale);
 
-  // Verificar disclaimer antes de cualquier otra cosa
+  // Verificar onboarding (disclaimer se maneja por página individualmente)
   const supabase = createClient();
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('disclaimer_accepted_at, onboarding_completed')
+    .select('onboarding_completed')
     .eq('id', user.id)
     .maybeSingle();
 
-  // Evitar loop: solo redirigir si NO estamos ya en /disclaimer
-  const headersList = headers();
-  const pathname = headersList.get('x-invoke-path') || '';
-  const isOnDisclaimer = pathname.includes('/disclaimer');
-
-  if (!isOnDisclaimer && !profile?.disclaimer_accepted_at) {
-    redirect(`/${locale}/disclaimer`);
-  }
-
-  // Solo después del disclaimer, verificar onboarding
   if (!profile?.onboarding_completed) {
     redirect(`/${locale}/coach?onboarding=true`);
   }
