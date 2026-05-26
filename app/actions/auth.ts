@@ -55,11 +55,12 @@ export async function signUp(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/es/login');
+  return { success: true, redirectTo: '/es/login' };
 }
 
 /**
  * Inicia sesión con email y contraseña.
+ * Retorna success en vez de redirect para evitar loops de redirección.
  */
 export async function signIn(formData: FormData) {
   const supabase = createClient();
@@ -81,8 +82,7 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  // Redirigir directo a /es/coach para evitar chain de redirects (dashboard → coach)
-  redirect('/es/coach');
+  return { success: true, redirectTo: '/es/coach' };
 }
 
 /**
@@ -93,5 +93,5 @@ export async function signOut() {
   await supabase.auth.signOut();
 
   revalidatePath('/', 'layout');
-  redirect('/login');
+  return { success: true, redirectTo: '/es/login' };
 }

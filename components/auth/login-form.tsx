@@ -18,6 +18,14 @@ export function LoginForm() {
 
     if (result?.error) {
       setError(result.error);
+      setIsLoading(false);
+      return;
+    }
+
+    if (result?.success && result?.redirectTo) {
+      // Navegación full-page para evitar cualquier loop del router
+      window.location.href = result.redirectTo;
+      return;
     }
 
     setIsLoading(false);

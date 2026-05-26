@@ -35,6 +35,13 @@ export function UserMenu({ user }: UserMenuProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  async function handleSignOut() {
+    const result = await signOut();
+    if (result?.success && result?.redirectTo) {
+      window.location.href = result.redirectTo;
+    }
+  }
+
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -52,15 +59,13 @@ export function UserMenu({ user }: UserMenuProps) {
             <p className="text-xs text-text-muted">{user.email}</p>
           </div>
           <div className="my-1 border-t border-border-subtle" />
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-overlay hover:text-status-danger"
-            >
-              <LogOut size={16} />
-              {t('logout')}
-            </button>
-          </form>
+          <button
+            onClick={handleSignOut}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-overlay hover:text-status-danger"
+          >
+            <LogOut size={16} />
+            {t('logout')}
+          </button>
         </div>
       )}
     </div>

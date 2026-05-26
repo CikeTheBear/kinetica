@@ -18,6 +18,13 @@ export function RegisterForm() {
 
     if (result?.error) {
       setError(result.error);
+      setIsLoading(false);
+      return;
+    }
+
+    if (result?.success && result?.redirectTo) {
+      window.location.href = result.redirectTo;
+      return;
     }
 
     setIsLoading(false);
