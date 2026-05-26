@@ -54,8 +54,20 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages} locale={locale}>
           {children}
         </NextIntlClientProvider>
-        {/* ServiceWorkerRegister desactivado temporalmente para evitar cache loops */}
-        {/* <ServiceWorkerRegister /> */}
+        {/* Emergency SW cleanup - removes old service workers that cause redirect loops */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  registrations.forEach(function(registration) {
+                    registration.unregister();
+                  });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
