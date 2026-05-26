@@ -56,13 +56,18 @@ export function useChatStream() {
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let accumulatedContent = '';
+      let buffer = ''; // Buffer para manejar chunks fragmentados
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Procesar solo líneas completas (que terminan en \n)
+        const lines = buffer.split('\n');
+        // La última línea puede estar incompleta, la guardamos para el próximo chunk
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -92,8 +97,30 @@ export function useChatStream() {
                 );
               }
             } catch {
-              // Ignorar JSON inválido
+              // Ignorar JSON inválido (puede ser un chunk incompleto)
             }
+          }
+        }
+      }
+      
+      // Procesar cualquier dato restante en el buffer
+      if (buffer.startsWith('data: ')) {
+        const data = buffer.slice(6);
+        if (data !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) {
+              accumulatedContent += parsed.content;
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, content: accumulatedContent, isStreaming: false }
+                    : msg
+                )
+              );
+            }
+          } catch {
+            // Ignorar
           }
         }
       }
