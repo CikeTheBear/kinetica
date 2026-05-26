@@ -162,6 +162,8 @@ async function callOpenRouterStream(
 
   return new ReadableStream({
     async start(controller) {
+      let streamEnded = false;
+      
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -175,13 +177,14 @@ async function callOpenRouterStream(
 
             const data = line.slice(6);
             if (data === '[DONE]') {
+              streamEnded = true;
+              
               // Si hay tool calls pendientes, ejecutarlas
               if (toolCalls.length > 0) {
                 for (const tc of toolCalls) {
                   try {
                     const args = JSON.parse(tc.function.arguments);
                     const result = await executeTool(tc.function.name, args, userId);
-                    // Enviar resultado al cliente como un mensaje del sistema
                     controller.enqueue(
                       new TextEncoder().encode(
                         `data: ${JSON.stringify({
@@ -221,7 +224,6 @@ async function callOpenRouterStream(
                       },
                     });
                   } else if (tc.function?.arguments) {
-                    // Continuación de arguments
                     const existing = toolCalls[toolCalls.length - 1];
                     if (existing) {
                       existing.function.arguments += tc.function.arguments;
@@ -241,12 +243,28 @@ async function callOpenRouterStream(
                 );
               }
             } catch {
-              // Ignorar
+              // Ignorar JSON malformado
             }
           }
         }
+        
+        // Si el stream termina sin [DONE], enviar [DONE] de todos modos
+        if (!streamEnded) {
+          if (fullContent) {
+            await saveAssistantMessage(userId, fullContent);
+          }
+          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+          controller.close();
+        }
       } catch (error) {
-        controller.error(error);
+        console.error('Error en stream de OpenRouter:', error);
+        controller.enqueue(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ content: 'Error en el servidor. Por favor, inténtalo de nuevo.' })}\n\n`
+          )
+        );
+        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+        controller.close();
       }
     },
     cancel() {
@@ -272,11 +290,14 @@ function createErrorStream(message: string): ReadableStream {
 async function saveAssistantMessage(userId: string, content: string) {
   try {
     const supabase = createClient();
-    await supabase.from('chat_messages').insert({
+    const { error } = await supabase.from('chat_messages').insert({
       user_id: userId,
       role: 'assistant',
       content,
     });
+    if (error) {
+      console.error('Error guardando mensaje del asistente en BD:', error);
+    }
   } catch (error) {
     console.error('Error guardando mensaje del asistente:', error);
   }
