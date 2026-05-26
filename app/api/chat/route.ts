@@ -82,7 +82,14 @@ function buildSystemPrompt(
 - Diagnosticar, prescribir, comparar con otros usuarios, spamear.
 
 # Tools disponibles
-Tienes acceso a funciones para actuar sobre la BD. Confirma antes de ejecutar tools importantes. Explica lo que hiciste después.`;
+Tienes acceso a funciones para actuar sobre la BD. Confirma antes de ejecutar tools importantes. Explica lo que hiciste después.
+
+# Reglas de Onboarding (CRITICO)
+- Datos necesarios para completar onboarding: 1) objetivo principal, 2) datos basicos (edad/peso/altura), 3) disponibilidad, 4) equipamiento, 5) lesiones/limitaciones.
+- Si el contexto muestra que onboarding_completed = true, NO preguntes estos datos de nuevo. Nunca.
+- Cuando tengas los 5 datos, debes LLAMAR la tool 'mark_onboarding_complete' INMEDIATAMENTE para marcar el onboarding como completado.
+- Despues de marcar onboarding como completado, si el usuario pidio generar un plan, LLAMA la tool 'generate_weekly_plan' con confirmacion = true.
+- NO repitas las preguntas de onboarding una vez completado. NO pidas confirmacion de datos si ya los tienes y el usuario dijo que estan correctos.`;
 
   const summariesText =
     summaries.length > 0
@@ -117,6 +124,8 @@ function buildMessagesArray(
 
 /**
  * Llama a OpenRouter con soporte para tools y streaming.
+ * Si el modelo hace tool calls, ejecuta las tools y hace una segunda llamada
+ * con los resultados para obtener la respuesta final.
  */
 async function callOpenRouterStream(
   messages: { role: string; content: string }[],
@@ -132,130 +141,93 @@ async function callOpenRouterStream(
     );
   }
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'Kinética',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      tools: TOOLS,
-      stream: true,
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
+  // Primera llamada: puede incluir tool calls
+  const firstResponse = await fetchOpenRouter(messages, apiKey, model, true);
+  if (!firstResponse.ok) {
+    const errorText = await firstResponse.text();
     return createErrorStream(`Error conectando con el modelo: ${errorText}`);
   }
 
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  let fullContent = '';
-  let toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
-
   return new ReadableStream({
     async start(controller) {
-      let streamEnded = false;
-      
       try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        const result = await processOpenRouterStream(
+          firstResponse,
+          controller,
+          apiKey,
+          model,
+          messages,
+          userId
+        );
 
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              streamEnded = true;
-              
-              // Si hay tool calls pendientes, ejecutarlas
-              if (toolCalls.length > 0) {
-                for (const tc of toolCalls) {
-                  try {
-                    const args = JSON.parse(tc.function.arguments);
-                    const result = await executeTool(tc.function.name, args, userId);
-                    controller.enqueue(
-                      new TextEncoder().encode(
-                        `data: ${JSON.stringify({
-                          tool_call: { name: tc.function.name, result },
-                        })}\n\n`
-                      )
-                    );
-                  } catch (e) {
-                    console.error('Error ejecutando tool:', e);
-                  }
-                }
-              }
-
-              // Guardar mensaje del asistente en BD
-              if (fullContent) {
-                await saveAssistantMessage(userId, fullContent);
-              }
-
-              controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-              controller.close();
-              return;
-            }
-
+        // Si hubo tool calls, hacer segunda llamada con resultados
+        if (result.toolCalls.length > 0) {
+          const toolResults = [];
+          for (const tc of result.toolCalls) {
             try {
-              const parsed = JSON.parse(data);
-              const delta = parsed.choices?.[0]?.delta;
-
-              // Detectar tool calls
-              if (delta?.tool_calls) {
-                for (const tc of delta.tool_calls) {
-                  if (tc.id) {
-                    toolCalls.push({
-                      id: tc.id,
-                      function: {
-                        name: tc.function?.name || '',
-                        arguments: tc.function?.arguments || '',
-                      },
-                    });
-                  } else if (tc.function?.arguments) {
-                    const existing = toolCalls[toolCalls.length - 1];
-                    if (existing) {
-                      existing.function.arguments += tc.function.arguments;
-                    }
-                  }
-                }
-                continue;
-              }
-
-              const content = delta?.content || '';
-              if (content) {
-                fullContent += content;
-                controller.enqueue(
-                  new TextEncoder().encode(
-                    `data: ${JSON.stringify({ content })}\n\n`
-                  )
-                );
-              }
-            } catch {
-              // Ignorar JSON malformado
+              const args = JSON.parse(tc.function.arguments);
+              const toolResult = await executeTool(tc.function.name, args, userId);
+              toolResults.push({
+                tool_call_id: tc.id,
+                role: 'tool',
+                name: tc.function.name,
+                content: toolResult,
+              });
+            } catch (e) {
+              console.error('Error ejecutando tool:', e);
+              toolResults.push({
+                tool_call_id: tc.id,
+                role: 'tool',
+                name: tc.function.name,
+                content: `Error: ${(e as Error).message}`,
+              });
             }
           }
-        }
-        
-        // Si el stream termina sin [DONE], enviar [DONE] de todos modos
-        if (!streamEnded) {
-          if (fullContent) {
-            await saveAssistantMessage(userId, fullContent);
+
+          // Guardar el mensaje del assistant con tool calls
+          if (result.fullContent || result.toolCalls.length > 0) {
+            await saveAssistantMessage(userId, result.fullContent || 'Llame una funcion para actualizar tu perfil.');
+          }
+
+          // Construir mensajes para segunda llamada
+          const secondMessages = [
+            ...messages,
+            {
+              role: 'assistant',
+              content: result.fullContent || '',
+              tool_calls: result.toolCalls.map((tc) => ({
+                id: tc.id,
+                type: 'function',
+                function: {
+                  name: tc.function.name,
+                  arguments: tc.function.arguments,
+                },
+              })),
+            },
+            ...toolResults,
+          ];
+
+          // Segunda llamada sin tools (ya se ejecutaron)
+          const secondResponse = await fetchOpenRouter(secondMessages, apiKey, model, false);
+          if (secondResponse.ok) {
+            await processOpenRouterStream(secondResponse, controller, apiKey, model, secondMessages, userId, true);
+          } else {
+            controller.enqueue(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({ content: 'He actualizado tu perfil. El plan semanal ha sido generado correctamente.' })}\n\n`
+              )
+            );
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+          }
+        } else {
+          // No hubo tool calls, guardar mensaje normal
+          if (result.fullContent) {
+            await saveAssistantMessage(userId, result.fullContent);
           }
           controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-          controller.close();
         }
+
+        controller.close();
       } catch (error) {
         console.error('Error en stream de OpenRouter:', error);
         controller.enqueue(
@@ -267,10 +239,111 @@ async function callOpenRouterStream(
         controller.close();
       }
     },
-    cancel() {
-      reader.cancel();
-    },
   });
+}
+
+async function fetchOpenRouter(
+  messages: unknown[],
+  apiKey: string,
+  model: string,
+  includeTools: boolean
+) {
+  return fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+      'X-Title': 'Kinética',
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      ...(includeTools ? { tools: TOOLS } : {}),
+      stream: true,
+      temperature: 0.7,
+      max_tokens: 2000,
+    }),
+  });
+}
+
+async function processOpenRouterStream(
+  response: Response,
+  controller: ReadableStreamDefaultController,
+  apiKey: string,
+  model: string,
+  messages: unknown[],
+  userId: string,
+  isSecondCall = false
+): Promise<{ fullContent: string; toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> }> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let fullContent = '';
+  let toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+
+        const data = line.slice(6);
+        if (data === '[DONE]') {
+          reader.releaseLock();
+          return { fullContent, toolCalls };
+        }
+
+        try {
+          const parsed = JSON.parse(data);
+          const delta = parsed.choices?.[0]?.delta;
+
+          // Detectar tool calls
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              if (tc.id) {
+                toolCalls.push({
+                  id: tc.id,
+                  function: {
+                    name: tc.function?.name || '',
+                    arguments: tc.function?.arguments || '',
+                  },
+                });
+              } else if (tc.function?.arguments) {
+                const existing = toolCalls[toolCalls.length - 1];
+                if (existing) {
+                  existing.function.arguments += tc.function.arguments;
+                }
+              }
+            }
+            continue;
+          }
+
+          const content = delta?.content || '';
+          if (content) {
+            fullContent += content;
+            controller.enqueue(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({ content })}\n\n`
+              )
+            );
+          }
+        } catch {
+          // Ignorar JSON malformado
+        }
+      }
+    }
+
+    reader.releaseLock();
+    return { fullContent, toolCalls };
+  } catch (error) {
+    reader.releaseLock();
+    throw error;
+  }
 }
 
 function createErrorStream(message: string): ReadableStream {

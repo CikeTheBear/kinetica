@@ -30,9 +30,22 @@ export const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'mark_onboarding_complete',
+      description:
+        'Marca el onboarding del usuario como completado. Usar UNICAMENTE cuando ya se hayan recopilado: objetivo, datos básicos (edad/peso/altura), disponibilidad, equipamiento y lesiones. Después de llamar esta función, proceder a generar el plan semanal si el usuario lo pidió.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'generate_weekly_plan',
       description:
-        'Genera un plan semanal completo de entrenamiento. Usar cuando el usuario pide un nuevo plan, al inicio de semana, o cuando hay cambios significativos (nueva lesión, cambio de objetivo, etc.).',
+        'Genera un plan semanal completo de entrenamiento. Usar cuando el usuario pide un nuevo plan, al inicio de semana, o cuando hay cambios significativos. SIEMPRE llamar mark_onboarding_complete primero si el usuario aún no ha completado onboarding.',
       parameters: {
         type: 'object',
         properties: {
@@ -60,6 +73,9 @@ export async function executeTool(
     case 'update_user_profile': {
       const a = args as { field: string; value: string };
       return updateUserProfile(a, userId);
+    }
+    case 'mark_onboarding_complete': {
+      return markOnboardingComplete(userId);
     }
     case 'generate_weekly_plan': {
       return generateWeeklyPlan(userId);
@@ -107,6 +123,24 @@ async function updateUserProfile(
   }
 
   return `Perfil actualizado: ${args.field} = ${args.value}`;
+}
+
+async function markOnboardingComplete(userId: string): Promise<string> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ onboarding_completed: true })
+      .eq('id', userId);
+
+    if (error) {
+      return `Error marcando onboarding como completado: ${error.message}`;
+    }
+
+    return 'Onboarding completado. Perfil actualizado.';
+  } catch (error) {
+    return `Error: ${(error as Error).message}`;
+  }
 }
 
 async function generateWeeklyPlan(userId: string): Promise<string> {
