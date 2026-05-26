@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth';
-import { createClient } from '@/lib/supabase/server';
 import { BottomNav } from '@/components/bottom-nav';
 import { UserMenu } from '@/components/auth/user-menu';
 
@@ -12,18 +11,6 @@ export default async function DashboardLayout({
   params: { locale: string };
 }) {
   const user = await requireUser(locale);
-
-  // Verificar onboarding (disclaimer se maneja por página individualmente)
-  const supabase = createClient();
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('onboarding_completed')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (!profile?.onboarding_completed) {
-    redirect(`/${locale}/coach?onboarding=true`);
-  }
 
   return (
     <div className="flex min-h-dvh flex-col">

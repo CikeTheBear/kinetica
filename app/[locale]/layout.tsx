@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-// import { ServiceWorkerRegister } from '@/components/service-worker-register';
+import { ServiceWorkerRegister } from '@/components/service-worker-register';
 import './../globals.css';
 
 const inter = Inter({
@@ -45,7 +45,6 @@ export default async function RootLayout({
   children: React.ReactNode;
   params: { locale: string };
 }) {
-  // Carga los mensajes del locale actual para el provider del cliente
   const messages = await getMessages();
 
   return (
@@ -54,20 +53,7 @@ export default async function RootLayout({
         <NextIntlClientProvider messages={messages} locale={locale}>
           {children}
         </NextIntlClientProvider>
-        {/* Emergency SW cleanup - removes old service workers that cause redirect loops */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  registrations.forEach(function(registration) {
-                    registration.unregister();
-                  });
-                });
-              }
-            `,
-          }}
-        />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
