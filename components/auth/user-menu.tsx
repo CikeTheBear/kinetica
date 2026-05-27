@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { signOut } from '@/app/actions/auth';
 import { LogOut, User } from 'lucide-react';
 
@@ -17,6 +17,7 @@ interface UserMenuProps {
 
 export function UserMenu({ user }: UserMenuProps) {
   const t = useTranslations('auth');
+  const locale = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +37,7 @@ export function UserMenu({ user }: UserMenuProps) {
   }, []);
 
   async function handleSignOut() {
-    const result = await signOut();
+    const result = await signOut(locale);
     if (result?.success && result?.redirectTo) {
       window.location.href = result.redirectTo;
     }

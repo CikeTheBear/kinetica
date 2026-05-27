@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/navigation';
 import { signIn } from '@/app/actions/auth';
 
 export function LoginForm() {
   const t = useTranslations('auth');
+  const locale = useLocale();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -33,6 +34,8 @@ export function LoginForm() {
 
   return (
     <form action={handleSubmit} className="flex flex-col gap-4">
+      {/* Locale activo: la action lo lee para construir el redirect en el idioma correcto */}
+      <input type="hidden" name="locale" value={locale} />
       {error && (
         <div className="rounded-lg bg-status-danger/10 px-4 py-3 text-sm text-status-danger">
           {error}
