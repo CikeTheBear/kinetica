@@ -119,7 +119,7 @@ export function CoachChat() {
           </button>
         </div>
         <p className="mx-auto mt-1 max-w-md text-center text-[10px] text-text-muted">
-          Enter para enviar · Shift+Enter para nueva linea
+          {t('inputHint')}
         </p>
       </form>
     </div>

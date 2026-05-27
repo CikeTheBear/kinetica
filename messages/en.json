@@ -22,7 +22,10 @@
   "dashboard": {
     "title": "Dashboard",
     "greeting": "Hello",
-    "emptyState": "No data yet. Complete your onboarding with Kai."
+    "emptyState": "No data yet. Complete your onboarding with Kai.",
+    "onboardingTitle": "Get started with Kai",
+    "onboardingBody": "Tell Kai your goal, availability and equipment, and he'll generate your personalized training plan.",
+    "onboardingCta": "Chat with Kai"
   },
   "plan": {
     "title": "Weekly plan",
@@ -31,12 +34,16 @@
     "generateButton": "Generate plan",
     "regenerateButton": "Regenerate",
     "noPlanTitle": "No active plan",
-    "noPlanDescription": "Kai hasn't generated your weekly plan yet. Start chatting with him or generate one now."
+    "noPlanDescription": "Kai hasn't generated your weekly plan yet. Start chatting with him or generate one now.",
+    "generating": "Generating...",
+    "weekOf": "Week of",
+    "errorGenerating": "Couldn't generate the plan. Please try again."
   },
   "coach": {
     "title": "Coach Kai",
     "placeholder": "Type a message...",
-    "emptyState": "You'll chat with Kai, your personal coach, here."
+    "emptyState": "You'll chat with Kai, your personal coach, here.",
+    "inputHint": "Enter to send · Shift+Enter for new line"
   },
   "disclaimer": {
     "title": "Important medical notice",

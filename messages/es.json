@@ -22,7 +22,10 @@
   "dashboard": {
     "title": "Dashboard",
     "greeting": "Hola",
-    "emptyState": "Aún no hay datos. Completa tu onboarding con Kai."
+    "emptyState": "Aún no hay datos. Completa tu onboarding con Kai.",
+    "onboardingTitle": "Empieza con Kai",
+    "onboardingBody": "Cuéntale a Kai tu objetivo, tu disponibilidad y tu equipamiento, y generará tu plan de entrenamiento personalizado.",
+    "onboardingCta": "Hablar con Kai"
   },
   "plan": {
     "title": "Plan semanal",
@@ -31,12 +34,16 @@
     "generateButton": "Generar plan",
     "regenerateButton": "Regenerar",
     "noPlanTitle": "Sin plan activo",
-    "noPlanDescription": "Kai aún no ha generado tu plan semanal. Empieza conversando con él o genera uno ahora."
+    "noPlanDescription": "Kai aún no ha generado tu plan semanal. Empieza conversando con él o genera uno ahora.",
+    "generating": "Generando...",
+    "weekOf": "Semana del",
+    "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo."
   },
   "coach": {
     "title": "Coach Kai",
     "placeholder": "Escribe un mensaje...",
-    "emptyState": "Aquí hablarás con Kai, tu coach personal."
+    "emptyState": "Aquí hablarás con Kai, tu coach personal.",
+    "inputHint": "Enter para enviar · Shift+Enter para nueva línea"
   },
   "disclaimer": {
     "title": "Aviso médico importante",

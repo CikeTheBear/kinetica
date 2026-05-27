@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,6 +32,7 @@ interface PlanSemanal {
 
 export function WeeklyPlanView() {
   const t = useTranslations('plan');
+  const locale = useLocale();
   const [plan, setPlan] = useState<PlanSemanal | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -68,10 +69,10 @@ export function WeeklyPlanView() {
         setPlan(data.plan);
       } else {
         const error = await response.json();
-        alert(error.error || 'Error generando plan');
+        alert(error.error || t('errorGenerating'));
       }
     } catch (error) {
-      alert('Error generando plan');
+      alert(t('errorGenerating'));
     } finally {
       setGenerating(false);
     }
@@ -96,7 +97,7 @@ export function WeeklyPlanView() {
           disabled={generating}
           className="mt-6 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-[#0A0E14] transition-colors hover:bg-accent-hover disabled:opacity-50"
         >
-          {generating ? 'Generando...' : t('generateButton')}
+          {generating ? t('generating') : t('generateButton')}
         </button>
       </div>
     );
@@ -112,7 +113,7 @@ export function WeeklyPlanView() {
           <div>
             <h2 className="text-lg font-semibold text-text-primary">{t('title')}</h2>
             <p className="mt-1 text-xs text-text-muted">
-              Semana del {formatDate(plan.semana_inicio)}
+              {t('weekOf')} {formatDate(plan.semana_inicio, locale)}
             </p>
           </div>
           <button
@@ -274,9 +275,11 @@ function ExerciseRow({
   );
 }
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string, locale: string): string {
   const date = new Date(dateString);
-  return date.toLocaleDateString('es-ES', {
+  // Mapear el locale de la app al BCP-47 que espera toLocaleDateString.
+  const intlLocale = locale === 'en' ? 'en-US' : 'es-ES';
+  return date.toLocaleDateString(intlLocale, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
