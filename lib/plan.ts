@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getUserContext } from '@/lib/memory';
+import { getCatalogForUser } from '@/lib/wger';
 import { z } from 'zod';
 
 /**
@@ -91,7 +92,8 @@ async function generateAndValidatePlan(
   apiKey: string,
   model: string,
   systemPrompt: string,
-  nextMonday: string
+  nextMonday: string,
+  validWgerIds: Set<number>
 ): Promise<PlanSemanal | null> {
   const MAX_ATTEMPTS = 3;
 
@@ -164,12 +166,25 @@ Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de w
         if (parsedPlan !== undefined) {
           const validationResult = PlanSemanalSchema.safeParse(parsedPlan);
           if (validationResult.success) {
-            return validationResult.data;
+            // Validación dura: todos los wger_id deben existir en el catálogo
+            // que le pasamos. Cierra el agujero de que el LLM invente ejercicios.
+            const inventados = validationResult.data.dias
+              .flatMap((d) => d.ejercicios)
+              .map((e) => e.wger_id)
+              .filter((id) => !validWgerIds.has(id));
+
+            if (inventados.length === 0) {
+              return validationResult.data;
+            }
+            console.error(
+              `[plan] El plan usa wger_id fuera del catálogo (intento ${attempt}/${MAX_ATTEMPTS}): ${inventados.join(', ')}`
+            );
+          } else {
+            console.error(
+              `[plan] Plan inválido contra el schema Zod (intento ${attempt}/${MAX_ATTEMPTS})`,
+              validationResult.error.errors
+            );
           }
-          console.error(
-            `[plan] Plan inválido contra el schema Zod (intento ${attempt}/${MAX_ATTEMPTS})`,
-            validationResult.error.errors
-          );
         } else {
           console.error(
             `[plan] No se pudo extraer JSON de la respuesta (intento ${attempt}/${MAX_ATTEMPTS})`
@@ -278,6 +293,30 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
   const { context } = await getUserContext(userId);
   const locale = profile.locale || 'es';
 
+  // 4b. Cargar el catálogo de ejercicios accesible según el equipamiento del
+  // usuario. El LLM elegirá SOLO de esta lista (con wger_id reales), de modo que
+  // no pueda inventar ejercicios inexistentes. Esto requiere que exercises_cache
+  // esté poblado (POST /api/admin/sync-exercises).
+  const metadata = (profile.metadata_biometrica || {}) as Record<string, unknown>;
+  const equipamiento = Array.isArray(metadata.equipamiento)
+    ? (metadata.equipamiento as string[])
+    : [];
+  const catalogo = await getCatalogForUser(equipamiento);
+
+  if (catalogo.length === 0) {
+    return {
+      ok: false,
+      status: 503,
+      error:
+        'No hay ejercicios disponibles en el catálogo. ¿Se sincronizó exercises_cache con wger.de?',
+    };
+  }
+
+  const validWgerIds = new Set(catalogo.map((c) => c.wger_id));
+  const catalogoText = catalogo
+    .map((c) => `${c.wger_id} | ${c.nombre}${c.grupo_muscular ? ` | ${c.grupo_muscular}` : ''}`)
+    .join('\n');
+
   // 5. Config OpenRouter
   const apiKey = process.env.OPENROUTER_API_KEY;
   const model = process.env.OPENROUTER_DEFAULT_MODEL || 'openai/gpt-4o';
@@ -289,7 +328,7 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
   const systemPrompt = `Eres Kai, coach personal de Kinética. Genera un plan semanal de entrenamiento estructurado y preciso.
 
 REGLAS CRÍTICAS:
-1. Usa SOLO ejercicios que existan en wger.de (IDs reales).
+1. Usa ÚNICAMENTE ejercicios del CATÁLOGO de abajo. Cada "wger_id" del plan DEBE ser uno de los IDs listados. NO inventes ejercicios ni IDs que no estén en el catálogo.
 2. El plan debe cubrir exactamente 7 días (lunes a domingo).
 3. Respeta lesiones activas: si el usuario reportó una lesión, NO incluyas ejercicios que la agraven.
 4. Adapta volumen e intensidad al nivel de experiencia del usuario.
@@ -298,10 +337,14 @@ REGLAS CRÍTICAS:
 
 ${context}
 
+=== CATÁLOGO DE EJERCICIOS DISPONIBLES (formato: wger_id | nombre | grupo muscular) ===
+${catalogoText}
+=== FIN DEL CATÁLOGO ===
+
 Idioma del usuario: ${locale}. Genera todo el plan en ese idioma.`;
 
-  // 6. Generar con reintentos + validación
-  const validPlan = await generateAndValidatePlan(apiKey, model, systemPrompt, nextMonday);
+  // 6. Generar con reintentos + validación (Zod + wger_id dentro del catálogo)
+  const validPlan = await generateAndValidatePlan(apiKey, model, systemPrompt, nextMonday, validWgerIds);
 
   if (!validPlan) {
     return {
