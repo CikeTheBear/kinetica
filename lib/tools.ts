@@ -30,22 +30,9 @@ export const TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'mark_onboarding_complete',
-      description:
-        'Marca el onboarding del usuario como completado. Usar UNICAMENTE cuando ya se hayan recopilado: objetivo, datos básicos (edad/peso/altura), disponibilidad, equipamiento y lesiones. Después de llamar esta función, proceder a generar el plan semanal si el usuario lo pidió.',
-      parameters: {
-        type: 'object',
-        properties: {},
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
       name: 'generate_weekly_plan',
       description:
-        'Genera un plan semanal completo de entrenamiento. Usar cuando el usuario pide un nuevo plan, al inicio de semana, o cuando hay cambios significativos. SIEMPRE llamar mark_onboarding_complete primero si el usuario aún no ha completado onboarding.',
+        'Genera un plan semanal completo de entrenamiento. Usar cuando el usuario pide un nuevo plan, al inicio de semana, o cuando hay cambios significativos.',
       parameters: {
         type: 'object',
         properties: {
@@ -74,9 +61,6 @@ export async function executeTool(
       const a = args as { field: string; value: string };
       return updateUserProfile(a, userId);
     }
-    case 'mark_onboarding_complete': {
-      return markOnboardingComplete(userId);
-    }
     case 'generate_weekly_plan': {
       return generateWeeklyPlan(userId);
     }
@@ -86,6 +70,8 @@ export async function executeTool(
 }
 
 import { createClient } from '@/lib/supabase/server';
+import { isOnboardingDataComplete } from '@/lib/onboarding';
+import { generatePlanForUser } from '@/lib/plan';
 
 async function updateUserProfile(
   args: { field: string; value: string },
@@ -96,7 +82,7 @@ async function updateUserProfile(
   // Obtener perfil actual
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('metadata_biometrica')
+    .select('metadata_biometrica, onboarding_completed')
     .eq('id', userId)
     .single();
 
@@ -113,55 +99,45 @@ async function updateUserProfile(
   // Actualizar campo
   metadata[args.field] = parsedValue;
 
+  // Reevaluar el onboarding de forma determinística (NO dependemos del LLM).
+  // Si ya están los 5 datos y aún no estaba marcado, lo marcamos en el mismo UPDATE.
+  const update: { metadata_biometrica: unknown; onboarding_completed?: boolean } = {
+    metadata_biometrica: metadata,
+  };
+  const justCompleted =
+    !profile?.onboarding_completed && isOnboardingDataComplete(metadata);
+  if (justCompleted) {
+    update.onboarding_completed = true;
+  }
+
   const { error } = await supabase
     .from('user_profiles')
-    .update({ metadata_biometrica: metadata })
+    .update(update)
     .eq('id', userId);
 
   if (error) {
     return `Error actualizando perfil: ${error.message}`;
   }
 
-  return `Perfil actualizado: ${args.field} = ${args.value}`;
-}
-
-async function markOnboardingComplete(userId: string): Promise<string> {
-  try {
-    const supabase = createClient();
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({ onboarding_completed: true })
-      .eq('id', userId);
-
-    if (error) {
-      return `Error marcando onboarding como completado: ${error.message}`;
-    }
-
-    return 'Onboarding completado. Perfil actualizado.';
-  } catch (error) {
-    return `Error: ${(error as Error).message}`;
+  if (justCompleted) {
+    return `Perfil actualizado: ${args.field} = ${args.value}. Onboarding completado (todos los datos mínimos recopilados).`;
   }
+  return `Perfil actualizado: ${args.field} = ${args.value}`;
 }
 
 async function generateWeeklyPlan(userId: string): Promise<string> {
   try {
-    // Como estamos en el servidor, hacemos una petición interna
-    // En producción esto debería ser una llamada directa a la función,
-    // pero para simplificar usamos fetch al endpoint local
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Llamamos directamente a la función reutilizable con el userId que ya
+    // tenemos. Antes esto hacía un fetch HTTP interno al endpoint /api/plan/generate,
+    // lo cual estaba roto: apuntaba a NEXT_PUBLIC_APP_URL (producción) y no
+    // reenviaba las cookies de sesión, así que el endpoint devolvía 401.
+    const result = await generatePlanForUser(userId);
 
-    const response = await fetch(`${appUrl}/api/plan/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      return `Error generando plan: ${error.error || response.statusText}`;
+    if (!result.ok) {
+      return `Error generando plan: ${result.error}`;
     }
 
-    const data = await response.json();
-    return `Plan semanal generado correctamente para la semana del ${data.plan.semana_inicio}.`;
+    return `Plan semanal generado correctamente para la semana del ${result.plan.semana_inicio}.`;
   } catch (error) {
     return `Error generando plan: ${(error as Error).message}`;
   }

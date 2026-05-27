@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
   });
 
   // 4. Construir memoria (Capas 1, 2, 3)
-  const [context, recentMessages, summaries] = await Promise.all([
+  const [userContext, recentMessages, summaries] = await Promise.all([
     getUserContext(user.id),
     getRecentMessages(user.id, 20),
     getChatSummaries(user.id, 5),
   ]);
 
   // 5. Armar system prompt y mensajes
-  const systemPrompt = buildSystemPrompt(context, summaries, isProactive);
+  const systemPrompt = buildSystemPrompt(userContext, summaries, isProactive);
   const messages = buildMessagesArray(systemPrompt, recentMessages, message);
 
   // 6. Llamar a OpenRouter
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 }
 
 function buildSystemPrompt(
-  context: string,
+  userContext: { context: string; onboardingCompleted: boolean; hasProfile: boolean },
   summaries: { resumen: string }[],
   isProactive?: boolean
 ) {
@@ -82,14 +82,32 @@ function buildSystemPrompt(
 - Diagnosticar, prescribir, comparar con otros usuarios, spamear.
 
 # Tools disponibles
-Tienes acceso a funciones para actuar sobre la BD. Confirma antes de ejecutar tools importantes. Explica lo que hiciste después.
+Tienes acceso a funciones para actuar sobre la BD. Confirma antes de ejecutar tools importantes. Explica lo que hiciste después.`;
 
-# Reglas de Onboarding (CRITICO)
-- Datos necesarios para completar onboarding: 1) objetivo principal, 2) datos basicos (edad/peso/altura), 3) disponibilidad, 4) equipamiento, 5) lesiones/limitaciones.
-- Si el contexto muestra que onboarding_completed = true, NO preguntes estos datos de nuevo. Nunca.
-- Cuando tengas los 5 datos, debes LLAMAR la tool 'mark_onboarding_complete' INMEDIATAMENTE para marcar el onboarding como completado.
-- Despues de marcar onboarding como completado, si el usuario pidio generar un plan, LLAMA la tool 'generate_weekly_plan' con confirmacion = true.
-- NO repitas las preguntas de onboarding una vez completado. NO pidas confirmacion de datos si ya los tienes y el usuario dijo que estan correctos.`;
+  // El bloque de onboarding se incluye SOLO si aún no está completo. Antes se
+  // inyectaba siempre y el modelo, viendo "recopila estos 5 datos", reiniciaba
+  // el onboarding aunque el usuario ya lo hubiera terminado. Ahora el estado
+  // decide qué instrucciones recibe Kai (recopilar vs. actuar como coach).
+  const onboardingBlock = userContext.onboardingCompleted
+    ? `
+
+# Estado del onboarding
+- El usuario YA completó el onboarding. Sus datos están en el contexto de abajo.
+- NUNCA vuelvas a pedirle objetivo, edad, peso, altura, disponibilidad, equipamiento ni lesiones: ya los tienes.
+- Actúa como su coach: resuelve dudas, ajusta entrenamientos, motiva y, si lo pide, genera o modifica su plan.
+- Si el usuario pide generar su plan, llama 'generate_weekly_plan' con confirmacion = true.`
+    : `
+
+# Reglas de Onboarding
+- Recopila conversacionalmente estos 5 datos: 1) objetivo, 2) datos basicos (edad, altura, peso), 3) disponibilidad (dias por semana), 4) equipamiento, 5) lesiones/limitaciones.
+- Guarda CADA dato en cuanto lo tengas con la tool 'update_user_profile', usando EXACTAMENTE estos nombres de campo (schema canonico):
+  - objetivo_principal: uno de [fuerza, hipertrofia, perdida_grasa, salud_general, rendimiento_deportivo, recomposicion]
+  - edad: numero · altura_cm: numero · peso_inicial_kg: numero
+  - dias_disponibles: numero
+  - equipamiento: array JSON, ej. ["gimnasio_comercial"]
+  - lesiones_activas: array JSON. Si el usuario confirma que NO tiene lesiones, guardalo como array vacio: []
+- El sistema detecta y marca el onboarding como completado AUTOMATICAMENTE cuando estos datos esten guardados. NO tienes que marcarlo tu, ni anunciar que lo marcas.
+- Si el usuario pide generar su plan, llama 'generate_weekly_plan' con confirmacion = true.`;
 
   const summariesText =
     summaries.length > 0
@@ -100,7 +118,7 @@ Tienes acceso a funciones para actuar sobre la BD. Confirma antes de ejecutar to
     ? '\n\n[Mensaje proactivo: inicia con propósito claro, sin saludos genéricos.]'
     : '';
 
-  return `${basePrompt}\n\n${context}${summariesText}${proactiveNote}`;
+  return `${basePrompt}${onboardingBlock}\n\n${userContext.context}${summariesText}${proactiveNote}`;
 }
 
 function buildMessagesArray(
@@ -132,7 +150,7 @@ async function callOpenRouterStream(
   userId: string
 ): Promise<ReadableStream> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_DEFAULT_MODEL || 'anthropic/claude-3.5-sonnet';
+  const model = process.env.OPENROUTER_DEFAULT_MODEL || 'anthropic/claude-haiku-4.5';
 
   // Fallback si no hay API key configurada
   if (!apiKey) {
@@ -184,11 +202,6 @@ async function callOpenRouterStream(
             }
           }
 
-          // Guardar el mensaje del assistant con tool calls
-          if (result.fullContent || result.toolCalls.length > 0) {
-            await saveAssistantMessage(userId, result.fullContent || 'Llame una funcion para actualizar tu perfil.');
-          }
-
           // Construir mensajes para segunda llamada
           const secondMessages = [
             ...messages,
@@ -207,16 +220,29 @@ async function callOpenRouterStream(
             ...toolResults,
           ];
 
-          // Segunda llamada sin tools (ya se ejecutaron)
+          // Segunda llamada sin tools (ya se ejecutaron). Aquí llega la respuesta
+          // "real" que ve el usuario (diagnóstico, confirmación, etc.).
           const secondResponse = await fetchOpenRouter(secondMessages, apiKey, model, false);
           if (secondResponse.ok) {
-            await processOpenRouterStream(secondResponse, controller, apiKey, model, secondMessages, userId, true);
-          } else {
-            controller.enqueue(
-              new TextEncoder().encode(
-                `data: ${JSON.stringify({ content: 'He actualizado tu perfil. El plan semanal ha sido generado correctamente.' })}\n\n`
-              )
+            const second = await processOpenRouterStream(
+              secondResponse, controller, apiKey, model, secondMessages, userId, true
             );
+            // CLAVE: guardamos el contenido REAL que vio el usuario (texto previo a
+            // las tools + respuesta final), NO un placeholder. Guardar el placeholder
+            // corrompía el historial y hacía que Kai reiniciara el onboarding.
+            const finalContent = [result.fullContent, second.fullContent]
+              .filter(Boolean)
+              .join('\n\n')
+              .trim();
+            if (finalContent) {
+              await saveAssistantMessage(userId, finalContent);
+            }
+          } else {
+            const fallbackMsg = 'He actualizado tu perfil. ¿Quieres que continúe?';
+            controller.enqueue(
+              new TextEncoder().encode(`data: ${JSON.stringify({ content: fallbackMsg })}\n\n`)
+            );
+            await saveAssistantMessage(userId, fallbackMsg);
             controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
           }
         } else {
@@ -281,62 +307,78 @@ async function processOpenRouterStream(
   let fullContent = '';
   let toolCalls: Array<{ id: string; function: { name: string; arguments: string } }> = [];
 
+  // Buffer para acumular datos entre lecturas del reader. OpenRouter puede partir
+  // una línea SSE (`data: {...}`) entre dos chunks de red; sin este buffer, la línea
+  // partida se parsea mal, el JSON.parse falla y se pierde el fragmento (incluido un
+  // tool_call o el propio [DONE]), dejando el stream colgado.
+  let buffer = '';
+
+  // Procesa una línea SSE ya completa. Devuelve true si era el marcador [DONE].
+  const handleLine = (rawLine: string): boolean => {
+    const line = rawLine.replace(/\r$/, ''); // tolerar terminadores \r\n
+    if (!line.startsWith('data: ')) return false;
+
+    const data = line.slice(6);
+    if (data === '[DONE]') return true;
+
+    try {
+      const parsed = JSON.parse(data);
+      const delta = parsed.choices?.[0]?.delta;
+
+      // Detectar tool calls (pueden llegar fragmentados a lo largo de varios deltas)
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          if (tc.id) {
+            toolCalls.push({
+              id: tc.id,
+              function: {
+                name: tc.function?.name || '',
+                arguments: tc.function?.arguments || '',
+              },
+            });
+          } else if (tc.function?.arguments) {
+            const existing = toolCalls[toolCalls.length - 1];
+            if (existing) {
+              existing.function.arguments += tc.function.arguments;
+            }
+          }
+        }
+        return false;
+      }
+
+      const content = delta?.content || '';
+      if (content) {
+        fullContent += content;
+        controller.enqueue(
+          new TextEncoder().encode(`data: ${JSON.stringify({ content })}\n\n`)
+        );
+      }
+    } catch {
+      // Ignorar JSON malformado (no debería ocurrir ya con el buffer, pero por si acaso)
+    }
+    return false;
+  };
+
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      // La última línea puede estar incompleta: la guardamos para el próximo chunk.
+      buffer = lines.pop() || '';
 
       for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-
-        const data = line.slice(6);
-        if (data === '[DONE]') {
+        if (handleLine(line)) {
           reader.releaseLock();
           return { fullContent, toolCalls };
         }
-
-        try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta;
-
-          // Detectar tool calls
-          if (delta?.tool_calls) {
-            for (const tc of delta.tool_calls) {
-              if (tc.id) {
-                toolCalls.push({
-                  id: tc.id,
-                  function: {
-                    name: tc.function?.name || '',
-                    arguments: tc.function?.arguments || '',
-                  },
-                });
-              } else if (tc.function?.arguments) {
-                const existing = toolCalls[toolCalls.length - 1];
-                if (existing) {
-                  existing.function.arguments += tc.function.arguments;
-                }
-              }
-            }
-            continue;
-          }
-
-          const content = delta?.content || '';
-          if (content) {
-            fullContent += content;
-            controller.enqueue(
-              new TextEncoder().encode(
-                `data: ${JSON.stringify({ content })}\n\n`
-              )
-            );
-          }
-        } catch {
-          // Ignorar JSON malformado
-        }
       }
     }
+
+    // Procesar lo que quede en el buffer al cerrarse el stream (última línea sin \n).
+    if (buffer) handleLine(buffer);
 
     reader.releaseLock();
     return { fullContent, toolCalls };

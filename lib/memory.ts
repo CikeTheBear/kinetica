@@ -101,7 +101,14 @@ export async function getUserContext(userId: string) {
 
   parts.push('==================================');
 
-  return parts.join('\n');
+  // Devolvemos también el flag de onboarding como booleano de primera clase:
+  // el system prompt se construye de forma CONDICIONAL con él, en vez de
+  // depender de que el modelo "lo encuentre" enterrado dentro del JSON del perfil.
+  return {
+    context: parts.join('\n'),
+    onboardingCompleted: profile?.onboarding_completed === true,
+    hasProfile: !!profile,
+  };
 }
 
 /**
@@ -110,16 +117,20 @@ export async function getUserContext(userId: string) {
 export async function getRecentMessages(userId: string, limit: number = 20) {
   const supabase = createClient();
 
+  // Traemos los N MÁS RECIENTES (orden descendente + limit). Si ordenáramos
+  // ascending + limit, Postgres devolvería los N más ANTIGUOS de toda la
+  // conversación: el modelo nunca vería los últimos mensajes en cuanto el
+  // historial superara N. Luego revertimos para entregarlos en orden cronológico.
   const { data: messages, error } = await supabase
     .from('chat_messages')
     .select('*')
     .eq('user_id', userId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error || !messages) return [];
 
-  return messages;
+  return messages.reverse();
 }
 
 /**
