@@ -272,21 +272,9 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
   // 2. Calcular lunes de la semana que viene
   const nextMonday = getNextMonday();
 
-  // 3. Verificar que no haya ya un plan para esa semana
-  const { data: existingPlan } = await supabase
-    .from('weekly_plans')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('semana_inicio', nextMonday)
-    .maybeSingle();
-
-  if (existingPlan) {
-    return {
-      ok: false,
-      status: 409,
-      error: 'Ya existe un plan para la semana del ' + nextMonday,
-    };
-  }
+  // (Regenerar es válido: si ya hay un plan para esta semana lo reemplazamos.
+  // El borrado se hace MÁS ABAJO, solo cuando ya tenemos un plan nuevo válido,
+  // para no dejar al usuario sin plan si la generación falla.)
 
   // 4. Construir contexto para el LLM. getUserContext devuelve un objeto;
   // aquí solo necesitamos el bloque de texto del contexto.
@@ -355,7 +343,15 @@ Idioma del usuario: ${locale}. Genera todo el plan en ese idioma.`;
     };
   }
 
-  // 7. Guardar en BD
+  // 7. Guardar en BD. Si ya existía un plan para esta semana, lo borramos ahora
+  // (ya tenemos uno nuevo válido) para liberar el UNIQUE(user_id, semana_inicio)
+  // y permitir la regeneración sin dejar al usuario sin plan ante un fallo.
+  await supabase
+    .from('weekly_plans')
+    .delete()
+    .eq('user_id', userId)
+    .eq('semana_inicio', nextMonday);
+
   const { data: insertedPlan, error: insertError } = await supabase
     .from('weekly_plans')
     .insert({
