@@ -1,12 +1,30 @@
 /**
+ * ⚠️  ESTE SCRIPT ESTÁ ROTO — NO FUNCIONA TAL CUAL. ⚠️
+ *
+ * Motivo: usa SUPABASE_SERVICE_ROLE_KEY como contraseña de Postgres en la
+ * connection string (`postgresql://postgres:${serviceRoleKey}@...`). Eso es
+ * incorrecto. El service_role key es un JWT para la API de Supabase (PostgREST,
+ * Auth, etc.), NO la contraseña del usuario `postgres` de la base de datos.
+ * Por eso `client.connect()` falla con un error de autenticación.
+ *
+ * Para arreglarlo se necesita la DB password real (la que se define al crear
+ * el proyecto, disponible en Supabase Dashboard → Project Settings → Database →
+ * Connection string / Database password). Esa password debería leerse de una
+ * env var propia (p.ej. SUPABASE_DB_PASSWORD) y usarse en la connection string,
+ * NO el service_role key.
+ *
+ * No tengo esa password, así que no la he añadido. Carlos: cámbiala antes de usar.
+ *
+ * ---
+ *
  * Script para crear el trigger de auth.users en Supabase Cloud.
  * El SQL Editor a veces no tiene permisos para tocar auth.users,
- * pero una conexión directa con service_role sí.
+ * pero una conexión directa con la BD sí.
  *
  * Uso:
  *   npx tsx scripts/setup-auth-trigger.ts
  *
- * Requiere la variable SERVICE_ROLE_KEY en .env.local o como env var.
+ * Requiere la DB password real de Postgres (ver nota de arriba).
  */
 
 import { config } from 'dotenv';
