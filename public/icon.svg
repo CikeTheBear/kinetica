@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Placeholder temporal: "K" de Kinética en amarillo nitro sobre fondo de marca.
+       Reemplazar por iconos PNG definitivos (192x192 y 512x512) cuando estén listos. -->
+  <rect width="512" height="512" rx="112" fill="#0A0E14"/>
+  <text x="50%" y="50%" dy="0.34em" text-anchor="middle"
+        font-family="Inter, system-ui, sans-serif" font-size="320" font-weight="700"
+        fill="#E5FF00">K</text>
+</svg>
