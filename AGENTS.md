@@ -1,3 +1,6 @@
+> ⚠️ **Orden de autoridad cuando los docs se contradigan: `TODO.md` > `docs/ESTADO_ACTUAL.md` > este archivo > `docs/kinetica_prd.md`.**
+> `TODO.md` refleja el estado real más reciente. El PRD describe la visión objetivo, no lo implementado.
+
 # AGENTS.md — Kinética (Estado Actualizado Mayo 2026)
 
 ## Estado del repositorio

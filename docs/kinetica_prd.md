@@ -1,3 +1,7 @@
+> ⚠️ **Este documento describe el PRODUCTO OBJETIVO (la visión), NO el estado actual del código.**
+> Muchas features descritas aquí todavía no están implementadas, y partes del schema están desactualizadas.
+> Para saber qué funciona realmente hoy, lee `TODO.md` (fuente única de verdad del estado real).
+
 # 📋 DOCUMENTO DE ESPECIFICACIÓN TÉCNICA (PRD v2)
 
 ## PROYECTO: Kinética — AI-Powered Fitness Coach PWA
