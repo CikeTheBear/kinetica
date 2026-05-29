@@ -25,9 +25,13 @@ export async function GET() {
     .limit(1)
     .single();
 
+  // no-store: el plan activo se consulta siempre fresco (evita servir un plan
+  // antiguo desde la caché del navegador o un SW residual).
+  const noStore = { headers: { 'Cache-Control': 'no-store' } };
+
   if (error || !plan) {
-    return Response.json({ plan: null });
+    return Response.json({ plan: null }, noStore);
   }
 
-  return Response.json({ plan });
+  return Response.json({ plan }, noStore);
 }

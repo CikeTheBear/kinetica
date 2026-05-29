@@ -1,372 +1,161 @@
-# ESTADO ACTUAL — Kinética (Handoff para otro agente)
+# ESTADO ACTUAL — Kinética (Handoff técnico, 28 May 2026)
 
-> Documento creado el 26 May 2026 después de múltiples intentos de arreglar el chat de Kai.
-> Lee esto ANTES de tocar cualquier código.
+> Documento para el próximo agente que retome el proyecto. Lee `TODO.md` primero (estado funcional resumido) y luego este (detalles técnicos y reproducción del bug activo).
 
 ---
 
 ## TL;DR
 
-La app está deployada y funcional, pero el **chat de Kai tiene dos bugs críticos**:
-1. **Bucle de onboarding** — Kai no sabe cuándo marcar el onboarding como completado
-2. **Chat se cuelga** — Streaming SSE se rompe intermitentemente
-
-Todo lo demás (auth, UI base, plan semanal) funciona correctamente.
-
-**URL producción:** https://kinetica-delta.vercel.app
-**Supabase:** https://focbdmounzgaujtirvno.supabase.co
+- El proyecto está **funcional en su mayor parte**: auth, chat de Kai sin bucle, onboarding determinístico, generación de plan con ejercicios reales de wger.de validados.
+- **El bug de "regenerar no cambiaba el plan" está CERRADO** (ver sección abajo). La causa era backend (petición al LLM idéntica entre regeneraciones), no UI/SW como suponía el handoff anterior.
+- Estamos en la rama **`feature/wger-integration`**. Pendiente: commitear el fix, validar a fondo y mergear a `develop`.
+- Producción: https://kinetica-delta.vercel.app · Supabase: `focbdmounzgaujtirvno`.
 
 ---
 
-## Qué funciona (probado en producción)
+## Lo que se logró en la sesión anterior (cronológico)
 
-### ✅ Autenticación
-- Registro/login con Supabase Auth
-- Email confirmation desactivado para testing
-- User profiles se crean automáticamente al registrarse
+Esta sesión empezó con un proyecto heredado de otro agente que dejó múltiples bugs críticos. Se resolvieron:
 
-### ✅ Chat con Kai (parcial)
-- Streaming SSE funciona para mensajes simples
-- Markdown renderer (negritas, listas, tablas)
-- Memoria de 3 capas implementada (contexto + mensajes recientes + resúmenes)
-- Tool `update_user_profile` funciona (Kai puede guardar datos del usuario)
-- Onboarding conversacional: Kai pide los 5 datos necesarios
-
-### ✅ Plan Semanal
-- Endpoint `/api/plan/generate` genera plan vía OpenRouter structured outputs
-- Validación Zod incluida
-- Renderizado básico en UI
-
-### ✅ UI Base
-- Dark mode completo
-- Bottom nav con 3 tabs
-- i18n básico (es/en)
-- Multiline textarea para chat
-
----
-
-## 🐛 Bugs Críticos Detallados
-
-### Bug #1: Bucle de Onboarding
-
-**Síntoma:**
-Usuario: "Generalo, por favor"
-Kai: "Carlos, ya tengo tu perfil cargado... ¿Confirmas que quieres que genere tu plan?"
-Usuario: "Si, generalo"
-Kai: "Entendido, Carlos. Vamos a formalizar esto... Responde con precisión: Objetivo, datos básicos, disponibilidad..."
-
-→ Kai vuelve a preguntar los datos que YA tiene.
-
-**Arquitectura actual del onboarding:**
-
-```
-Frontend (coach-chat.tsx)
-  → useChatStream.ts (maneja SSE)
-    → POST /api/chat/route.ts
-      → Construye system prompt + mensajes
-      → Llama OpenRouter con tools
-      → Si hay tool calls, ejecuta y hace segunda llamada
-      → Stream resultado al cliente
-```
-
-**Qué se ha intentado:**
-
-1. **Tool `mark_onboarding_complete`** (`lib/tools.ts` línea ~50)
-   - Función que actualiza `user_profiles.onboarding_completed = true`
-   - Kai a veces la llama, a veces no, a veces finge que la llamó
-
-2. **Reglas en system prompt** (`app/api/chat/route.ts` líneas ~87-92)
-   - Se añadieron reglas estrictas:
-     - "Cuando tengas los 5 datos, llama mark_onboarding_complete INMEDIATAMENTE"
-     - "Si onboarding_completed = true, NUNCA preguntes estos datos"
-   - El modelo las ignora o las olvida a mitad de conversación
-
-3. **Tool calling con doble llamada** (`app/api/chat/route.ts`)
-   - Primera llamada: LLM decide si usar tools
-   - Si usa tools: se ejecutan y se hace segunda llamada con resultados
-   - Segunda llamada: LLM genera respuesta final
-   - Implementado pero el modelo sigue sin ser confiable
-
-**Por qué falla:**
-
-El modelo actual es `google/gemini-3-flash-preview`. Es económico pero:
-- No respeta bien system prompts complejos con muchas reglas
-- No es determinístico en tool calling (a veces responde en texto, a veces llama tool)
-- Tiene "memory" corta: olvida instrucciones del system prompt en conversaciones largas
-
-**Soluciones posibles:**
-
-**Opción A — Cambiar modelo (rápido)**
-- Cambiar `OPENROUTER_DEFAULT_MODEL` a `anthropic/claude-3.5-sonnet` o `openai/gpt-4o`
-- Son más caros pero respetan system prompts y tool calling
-- Estimado: $0.05-0.15 por conversación de onboarding vs $0.01 con Flash
-
-**Opción B — Hardcoded detection en backend (robusto)**
-- En el backend, detectar cuando el usuario ha confirmado los datos
-- Si tenemos los 5 datos y el usuario dice "si, generalo" → forzar llamada a `mark_onboarding_complete`
-- Luego forzar llamada a `generate_weekly_plan`
-- No depender del LLM para lógica de negocio crítica
-
-**Opción C — Wizard estructurado + chat separado (re-arquitectura)**
-- Crear wizard de onboarding con pasos estructurados (formularios)
-- Kai NO guía el onboarding, solo aparece al final para confirmar
-- Chat es solo para preguntas, no para recopilar datos estructurados
+1. **Auditoría profunda** (5 dominios en paralelo: chat, plan, auth, schema, frontend). Hallazgos consolidados y priorizados.
+2. **Chat de Kai sin bucle de onboarding**:
+   - Buffer SSE correcto en backend (antes se colgaba el chat).
+   - Onboarding determinístico en backend (`lib/onboarding.ts: isOnboardingDataComplete`). El LLM no marca el flag; lo hace `updateUserProfile` cuando los 5 datos canónicos están guardados.
+   - System prompt condicional (`app/api/chat/route.ts`): si `onboarding_completed` es true, entra en "modo coach" sin instrucciones de recopilar.
+   - Se guarda el contenido REAL de la 2ª llamada (no placeholder); antes corrompía el historial y causaba el bucle.
+   - `getRecentMessages` ahora trae los 20 más RECIENTES (antes los 20 más antiguos).
+   - Tests vitest sobre `isOnboardingDataComplete` (11 casos en verde).
+3. **Generación de plan robusta**:
+   - Lógica extraída a `lib/plan.ts: generatePlanForUser(userId)`, llamable in-process desde la tool de Kai (antes la tool hacía fetch HTTP a producción sin cookies → 401, nunca generaba).
+   - Eliminado `response_format: json_schema`: Bedrock (proveedor de Claude vía OpenRouter) rechaza constraints como `minItems`/`minimum`/`maximum`. Ahora el formato se pide por prompt y se valida con Zod.
+   - Reintentos con backoff (3 intentos). `getNextMonday` con timezone local correcta.
+   - Validación dura: `wger_id` deben existir en el catálogo pasado al LLM; si inventa uno, reintenta.
+4. **Auth y locale**: redirects con locale activo (antes hardcodeaba `/es/`), guard en `disclaimer`, eliminado insert manual redundante (lo cubre el trigger SQL).
+5. **UI y limpieza**: banner de onboarding en Dashboard en vez de redirect forzado a Coach, i18n extraído a `messages/`, fuentes via `next/font` sin doble carga, código muerto (`lib/wger.ts` viejo) eliminado.
+6. **Migración de ramas**: el repo pasó de `master` a `main` + `develop` siguiendo el flujo de Carlos.
+7. **Integración real de wger.de**: (rama `feature/wger-integration`, 2 commits)
+   - `lib/supabase/admin.ts` con service_role para escribir `exercises_cache`.
+   - `lib/wger.ts` reconstruido: cliente del catálogo, sync, y `getCatalogForUser` (filtra por equipamiento del usuario con mapeo Kinética ↔ wger).
+   - `POST /api/admin/sync-exercises` protegido con `SYNC_SECRET` (ejecutar 1 vez para poblar, luego cron).
+   - `lib/plan.ts` pasa el catálogo al LLM y valida que ningún `wger_id` se invente.
+   - `exercises_cache` ya tiene 846 ejercicios reales en BD.
+   - Fix de regenerar: ya no devuelve 409; reemplaza el plan de la semana solo si el nuevo es válido (borra viejo entonces).
 
 ---
 
-### Bug #2: Chat se cuelga (SSE streaming)
+## ✅ Bug cerrado — "Regenerar no cambiaba el plan"
 
-**Síntoma:**
-Después de 1-3 mensajes, el indicador de "escribiendo" aparece pero Kai nunca responde.
+### Síntoma
+En la pestaña Plan, al pulsar "Regenerar" el plan mostrado no cambiaba en nada — ni siquiera los ejercicios concretos al expandir una card.
 
-**Implementación actual del streaming:**
+### Causa raíz (la verdadera, distinta a lo que suponía el handoff anterior)
+La petición a OpenRouter en `lib/plan.ts: generateAndValidatePlan` era **byte-idéntica** entre regeneraciones consecutivas: `temperature: 0.5`, mismos `systemPrompt` y `formatInstructions`, **sin nonce ni `seed`**. La "semilla de variación" que las versiones previas de estos docs afirmaban NO existía en el código. Ante una petición idéntica, el proveedor (Claude vía Bedrock) devolvía la **misma completion** → el mismo `plan_json`.
 
-**Backend** (`app/api/chat/route.ts`):
-```typescript
-// Primera llamada a OpenRouter
-const firstResponse = await fetchOpenRouter(messages, apiKey, model, true);
+> Lección: el handoff anterior dio por "confirmado correcto" el backend basándose solo en logs server-side de una sesión, y marcó la UI/SW como sospechosos. La instrumentación del **cliente** (que nunca se llegó a ejecutar) era el paso decisivo y apuntó directo al backend.
 
-// Procesa stream
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  // Parsea chunks SSE
-  // Detecta tool calls
-  // Envía tokens al cliente
-}
+### Cómo se diagnosticó esta vez
+1. Se añadió `cache: 'no-store'` a los fetch del cliente + header `Cache-Control: no-store` a los endpoints (descarta caché de navegador/SW de raíz).
+2. Se instrumentó el cliente logueando la huella de `wger_id` recibida en `handleGeneratePlan`.
+3. Dos regeneraciones daban la **misma** huella `[539,1219,1467,1296,1919]` pese al `no-store` → el problema no era la red ni el render, sino que el backend devolvía lo mismo.
 
-// Si hubo tool calls, segunda llamada
-if (result.toolCalls.length > 0) {
-  // Ejecuta tools
-  // Segunda llamada sin tools
-  // Stream respuesta final
-}
-```
+### Fix aplicado (`lib/plan.ts`)
+- Nonce de variación (`variationSeed`) inyectado en el prompt del usuario + pasado como `seed` → cada regeneración manda una petición ÚNICA (rompe caché/determinismo del proveedor).
+- `temperature` 0.5 → 0.8.
+- Instrucción explícita al modelo de generar un plan distinto al anterior.
 
-**Frontend** (`components/chat/use-chat-stream.ts`):
-```typescript
-const reader = response.body!.getReader();
-const decoder = new TextDecoder();
-let buffer = '';
+Verificado: tras el fix las huellas cambian en cada regeneración y la UI refresca.
 
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  
-  buffer += decoder.decode(value, { stream: true });
-  const lines = buffer.split('\n');
-  buffer = lines.pop() || ''; // Guarda línea incompleta
-  
-  for (const line of lines) {
-    if (!line.startsWith('data: ')) continue;
-    const data = line.slice(6);
-    // Parsea JSON
-  }
-}
-```
-
-**Problemas conocidos:**
-
-1. **OpenRouter envía chunks fragmentados** — A veces un chunk SSE llega partido en medio de un JSON. El buffer maneja líneas incompletas pero a veces el JSON dentro de la línea también está partido.
-
-2. **Tool calls interrumpen el stream** — Cuando Kai decide usar una tool, el stream de tokens se detiene. Si la segunda llamada falla, el cliente nunca recibe `[DONE]`.
-
-3. **AbortController no se limpia** — Si el usuario envía un mensaje mientras el anterior está cargando, el abort puede dejar el stream en estado inconsistente.
-
-**Qué ya se intentó:**
-- Buffer de líneas en frontend (guarda línea incompleta entre chunks)
-- Manejo de errores try/catch en ambos lados
-- Refactor de tool calling para que siempre haya segunda llamada
-- `streamEnded` flag para asegurar `[DONE]`
-
-**Estado:** Parcialmente mejorado pero no 100% confiable. Requiere más trabajo.
+### Instrumentación
+La instrumentación temporal del cliente ya se revirtió. Los `cache: 'no-store'` se dejaron como mejora defensiva permanente.
 
 ---
 
-## 🏗️ Arquitectura del Código
-
-### Archivos clave y su propósito
+## Arquitectura — mapa rápido
 
 ```
 app/
 ├── api/
-│   ├── chat/
-│   │   └── route.ts           # POST /api/chat — SSE streaming con OpenRouter
-│   └── plan/
-│       ├── generate/
-│       │   └── route.ts       # POST /api/plan/generate — genera plan con structured output
-│       └── active/
-│           └── route.ts       # GET /api/plan/active — devuelve plan semanal actual
-├── actions/
-│   ├── auth.ts                # Server actions: login, register, logout (NO redirect, return {success, redirectTo})
-│   └── disclaimer.ts        # Server action para aceptar disclaimer
-├── [locale]/                  # Rutas i18n
-│   ├── (dashboard)/
-│   │   ├── layout.tsx         # Layout con bottom nav (NO checks de onboarding/disclaimer para evitar loops)
-│   │   ├── dashboard/
-│   │   │   └── page.tsx       # Tab Dashboard (placeholder)
-│   │   ├── coach/
-│   │   │   └── page.tsx       # Tab Coach (chat con Kai)
-│   │   └── plan/
-│   │       └── page.tsx       # Tab Plan (vista semanal)
-│   ├── login/
-│   │   └── page.tsx           # Login page
-│   ├── register/
-│   │   └── page.tsx           # Register page
-│   └── disclaimer/
-│       └── page.tsx           # Disclaimer médico (desactivado temporalmente)
-
-components/
-├── chat/
-│   ├── coach-chat.tsx         # Componente principal del chat (textarea, scroll, onboarding auto-init)
-│   ├── use-chat-stream.ts     # Hook SSE: fetch, parse chunks, manejar errores
-│   ├── chat-message.tsx       # Bubble de mensaje (user/assistant, streaming state)
-│   └── markdown-renderer.tsx  # Renderiza markdown con bloques especiales kinetica:*
-├── plan/
-│   └── weekly-plan-view.tsx   # Vista del plan semanal
-├── auth/
-│   ├── login-form.tsx
-│   ├── register-form.tsx
-│   └── user-menu.tsx          # Dropdown con logout
-├── bottom-nav.tsx             # Barra de navegación inferior (3 tabs)
-└── service-worker-register.tsx # Registra SW (desactivado temporalmente)
+│   ├── chat/route.ts          # SSE streaming + tools de Kai
+│   ├── plan/
+│   │   ├── generate/route.ts  # POST: delega en generatePlanForUser
+│   │   └── active/route.ts    # GET: plan activo del usuario
+│   └── admin/
+│       └── sync-exercises/route.ts  # POST protegido con SYNC_SECRET
+├── actions/auth.ts             # signUp/signIn/signOut (devuelven redirectTo, no redirect())
+└── [locale]/                   # i18n routing (next-intl, localePrefix 'always')
+    ├── (auth)/login, register
+    ├── (dashboard)/dashboard, plan, coach
+    └── disclaimer/             # server component con guard
 
 lib/
-├── tools.ts                   # Definición y ejecución de tools de Kai
-├── memory.ts                  # Capas de memoria: contexto, mensajes recientes, resúmenes
-├── onboarding.ts              # Helpers para onboarding (usado en auth)
-├── wger.ts                    # Cliente wger.de API (ejercicios)
-├── auth.ts                    # Helpers de autenticación
+├── plan.ts                     # ⭐ generación de plan (Zod, retries, catálogo wger)
+├── wger.ts                     # ⭐ cliente wger + sync + getCatalogForUser
+├── tools.ts                    # tools de Kai (update_user_profile, generate_weekly_plan)
+├── memory.ts                   # 3 capas de memoria para Kai
+├── onboarding.ts               # isOnboardingDataComplete (determinístico)
+├── auth.ts                     # requireUser
 └── supabase/
-    ├── server.ts              # Cliente Supabase server-side
-    └── client.ts              # Cliente Supabase client-side
+    ├── server.ts               # cliente de sesión (anon)
+    ├── client.ts               # cliente browser
+    └── admin.ts                # ⭐ cliente service_role (escribe exercises_cache)
 
-public/
-├── manifest.json              # PWA manifest
-├── sw.js                      # Service Worker kill-switch (desregistra SWs antiguos)
-└── icon-192x192.png           # Icono placeholder
+components/
+├── chat/coach-chat.tsx, use-chat-stream.ts, chat-message.tsx, markdown-renderer.tsx
+├── plan/weekly-plan-view.tsx   # ⭐ AQUÍ está el bug activo
+├── auth/login-form, register-form, user-menu
+└── bottom-nav.tsx, service-worker-register.tsx
 ```
 
-### Flujo de datos del chat
-
-```
-Usuario escribe → coach-chat.tsx → use-chat-stream.ts
-  → POST /api/chat
-    → auth (verifica usuario)
-    → guarda mensaje en chat_messages
-    → getUserContext (metadata_biometrica + perfil)
-    → getRecentMessages (últimos 20)
-    → getChatSummaries (últimos 5 resúmenes)
-    → buildSystemPrompt (junta todo)
-    → buildMessagesArray (system + history + mensaje actual)
-    → callOpenRouterStream
-      → fetch a OpenRouter con stream: true
-      → Lee chunks SSE
-      → Detecta tool calls
-      → Si hay tools:
-        → Ejecuta tools (executeTool)
-        → Segunda llamada a OpenRouter con resultados
-      → Stream tokens al cliente
-    → Guarda respuesta en chat_messages
-```
-
----
-
-## ⚠️ Decisiones Técnicas Tomadas (con contexto)
-
-### 1. No usar `redirect()` en server actions
-**Por qué:** Causaba loops de redirect con `next-intl` middleware. Las server actions de auth ahora devuelven `{ success: true, redirectTo: '/dashboard' }` y el frontend hace `window.location.href`.
-
-### 2. Eliminados checks de onboarding/disclaimer del layout
-**Por qué:** Causaban loops infinitos de redirect. El middleware detectaba `onboarding_completed = false` y redirigía a `/coach?onboarding=true`, pero el layout del dashboard hacía lo mismo.
-
-### 3. Kill-switch en Service Worker
-**Por qué:** SWs antiguos cacheaban rutas y causaban que deploys nuevos no se reflejasen. El SW actual (`public/sw.js`) solo se desregistra a sí mismo y limpia caches.
-
-### 4. Modelo económico pero problemático
-**Por qué:** Se eligió `google/gemini-3-flash-preview` para mantener costos bajos durante desarrollo. Resultó ser demasiado problemático para tool calling.
-
-### 5. Tool calling con doble llamada
-**Por qué:** OpenRouter streaming + tool calling es complejo. La implementación actual hace:
-1. Primera llamada: LLM decide usar tools o no
-2. Si usa tools: se ejecutan en el backend
-3. Segunda llamada: LLM recibe resultados de tools y genera respuesta final
-4. Todo se stream al cliente
-
-Es frágil pero es el patrón estándar para streaming + tools.
-
----
-
-## 🛠️ Próximos Pasos Recomendados
-
-### Prioridad 1 — Arreglar el chat (bloqueante)
-
-**Opción A: Cambiar modelo (más rápido)**
-1. Cambiar `OPENROUTER_DEFAULT_MODEL` a `anthropic/claude-3.5-sonnet`
-2. Probar onboarding de nuevo
-3. Si funciona, problema resuelto
-
-**Opción B: Hardcoded detection (más robusto)**
-1. En `app/api/chat/route.ts`, detectar cuando el usuario ha confirmado datos
-2. Si `metadata_biometrica` tiene los 5 datos completos y el usuario dice "si/generalo/confirma"
-3. Forzar llamada a `mark_onboarding_complete` y `generate_weekly_plan` sin depender del LLM
-4. Stream respuesta genérica al usuario
-
-**Opción C: Wizard estructurado (re-arquitectura)**
-1. Crear componente wizard con pasos: objetivo → datos → disponibilidad → equipamiento → lesiones
-2. Guardar datos en `metadata_biometrica` directamente desde el formulario
-3. Marcar `onboarding_completed = true` automáticamente al final
-4. Kai aparece SOLO después del wizard, para "coachear", no para recopilar datos
-
-### Prioridad 2 — Re-habilitar features desactivados
-
-1. **Disclaimer médico** — Implementar como modal en vez de redirect a página separada
-2. **Onboarding redirect** — Volver a añadir checks pero con lógica segura (no loops)
-3. **Service Worker real** — Implementar con estrategia stale-while-revalidate
-
-### Prioridad 3 — Features core faltantes
-
-1. **Registro de entrenamientos** — "En el Ruedo" con timer de descanso
-2. **Importación de datos** — Apple Health XML, CSV báscula
-3. **Dashboard con gráficas** — Charts de progreso
-4. **Videos de ejercicios** — YouTube Data API v3
-
----
-
-## 🔧 Comandos Útiles
+## Comandos útiles
 
 ```bash
-# Local dev
-npm run dev
+npm run dev         # dev server (suele subir en :3000 o :3001 si ocupado)
+npm run typecheck   # tsc --noEmit
+npm run test        # vitest --run
+npm run build       # build de producción
 
-# Type check
-npm run typecheck
+# Sincronizar exercises_cache (poblar/refrescar el catálogo de wger):
+curl -X POST http://localhost:3001/api/admin/sync-exercises \
+     -H "Authorization: Bearer $SYNC_SECRET"
 
-# Build
-npm run build
-
-# Deploy a producción
-vercel --prod
-
-# Ver logs en tiempo real
-vercel logs kinetica-delta.vercel.app --json
+vercel logs kinetica-delta.vercel.app --json   # logs de producción
 ```
 
+## Schema canónico de `metadata_biometrica`
+
+Ver `docs/kinetica_setup.md` sección 3. Los 5 datos mínimos de onboarding (verificados por `isOnboardingDataComplete`):
+
+- `objetivo_principal` (enum)
+- `edad`, `altura_cm`, `peso_inicial_kg` (números)
+- `dias_disponibles` (número)
+- `equipamiento` (array no vacío, enum de categorías de Kinética)
+- `lesiones_activas` (array; puede ser `[]` = preguntado, sin lesiones)
+
+## Mapeo de equipamiento Kinética ↔ wger
+
+En `lib/wger.ts: EQUIPMENT_MAP` y `SIN_FILTRO`. Resumen:
+
+- `peso_corporal_solo` → bodyweight + gym mat
+- `bandas_elasticas` → + resistance band
+- `mancuernas_basicas` → + dumbbell, kettlebell, bench, incline bench
+- `home_gym_completo`, `gimnasio_comercial`, `otro` → sin filtro (todo el catálogo)
+
 ---
 
-## 📞 Contacto
+## Política de cambios y commits
 
-**Dueño:** Carlos
-**Cualquier ambigüedad:** Consultar con Carlos antes de asumir. Especialmente decisiones de arquitectura, modelo LLM, o flujo de onboarding.
+- Flujo: features salen de `develop`; commits importantes a `main` como nuevas versiones.
+- Commits con Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`).
+- **No hacer commits sin pedirle a Carlos**. Sugerir el mensaje y esperar OK.
+- **No hacer push sin permiso explícito**.
+- Cambios importantes en arquitectura → confirmar antes de codear.
 
----
+## Memoria entre sesiones (auto-memory)
 
-## Historial de Cambios Recientes
+Si tienes acceso al sistema de auto-memory del usuario (ruta local `C:\Users\dealm\.claude-kluge\projects\C--00-CARLOS-C-02-CikeTheBear-kinetica\memory\`), hay 3 memorias clave:
 
-- **26 May 2026**: Refactor tool calling con doble llamada al LLM
-- **26 May 2026**: Añadida tool `mark_onboarding_complete`
-- **26 May 2026**: Reglas estrictas de onboarding en system prompt
-- **26 May 2026**: Multiline textarea para chat
-- **26 May 2026**: Fix de SSE parsing con buffer
-- **25 May 2026**: Eliminados redirects de onboarding para evitar loops
-- **Pre-25 May 2026**: Implementación inicial de auth, chat, plan semanal
+- `project_handoff.md`: el proyecto vino de otro agente que no funcionaba.
+- `feedback_onboarding_conversacional.md`: el onboarding debe ser chat natural con Kai, NO wizard.
+- `feedback_git_workflow.md`: main/develop/feature flow.
+
+Si NO tienes acceso (cuenta distinta de Claude), todo el contexto crítico está en este archivo y en `TODO.md`.

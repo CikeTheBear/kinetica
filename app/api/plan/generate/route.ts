@@ -33,9 +33,13 @@ export async function POST(_request: NextRequest) {
     );
   }
 
-  return Response.json({
-    success: true,
-    plan: result.plan,
-    message: 'Plan semanal generado correctamente',
-  });
+  return Response.json(
+    {
+      success: true,
+      plan: result.plan,
+      message: 'Plan semanal generado correctamente',
+    },
+    // no-store: el plan regenerado nunca debe servirse desde caché.
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
 }

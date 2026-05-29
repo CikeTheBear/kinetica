@@ -44,7 +44,8 @@ export function WeeklyPlanView() {
 
   async function fetchActivePlan() {
     try {
-      const response = await fetch('/api/plan/active');
+      // no-store: nunca servir un plan cacheado por el navegador/SW.
+      const response = await fetch('/api/plan/active', { cache: 'no-store' });
       if (response.ok) {
         const data = await response.json();
         setPlan(data.plan);
@@ -62,6 +63,7 @@ export function WeeklyPlanView() {
       const response = await fetch('/api/plan/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
       });
 
       if (response.ok) {
