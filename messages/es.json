@@ -37,7 +37,28 @@
     "noPlanDescription": "Kai aún no ha generado tu plan semanal. Empieza conversando con él o genera uno ahora.",
     "generating": "Generando...",
     "weekOf": "Semana del",
-    "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo."
+    "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo.",
+    "trainButton": "Entrenar"
+  },
+  "ruedo": {
+    "backToPlan": "Volver al plan",
+    "seriesDone": "series",
+    "finishWorkout": "Finalizar entrenamiento",
+    "saving": "Guardando...",
+    "saveError": "No se pudo guardar el entrenamiento. Inténtalo de nuevo.",
+    "savedTitle": "¡Entrenamiento guardado!",
+    "savedBody": "Buen trabajo. Tu progreso quedó registrado.",
+    "restLabel": "Descanso",
+    "restDone": "¡Listo!",
+    "restAdd15": "Añadir 15 segundos",
+    "restPause": "Pausar",
+    "restResume": "Reanudar",
+    "restSkip": "Saltar descanso",
+    "suggested": "Sugerido",
+    "colSet": "Serie",
+    "colWeight": "Peso",
+    "colReps": "Reps",
+    "completeSet": "Completar serie"
   },
   "coach": {
     "title": "Coach Kai",

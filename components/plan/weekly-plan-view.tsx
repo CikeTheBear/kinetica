@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame } from 'lucide-react';
+import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame, Play } from 'lucide-react';
+import { Link } from '@/navigation';
 import { cn } from '@/lib/utils';
 
 interface PlanSemanal {
@@ -157,6 +158,7 @@ function DayCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations('plan');
   const isRestDay = dia.es_descanso;
 
   return (
@@ -226,6 +228,15 @@ function DayCard({
                   index={index}
                 />
               ))}
+
+              {/* CTA para entrar a "En el Ruedo" y ejecutar este día. */}
+              <Link
+                href={`/ruedo/${dia.dia}`}
+                className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover"
+              >
+                <Play size={16} strokeWidth={2} />
+                {t('trainButton')}
+              </Link>
             </div>
           </motion.div>
         )}

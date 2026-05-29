@@ -37,7 +37,28 @@
     "noPlanDescription": "Kai hasn't generated your weekly plan yet. Start chatting with him or generate one now.",
     "generating": "Generating...",
     "weekOf": "Week of",
-    "errorGenerating": "Couldn't generate the plan. Please try again."
+    "errorGenerating": "Couldn't generate the plan. Please try again.",
+    "trainButton": "Train"
+  },
+  "ruedo": {
+    "backToPlan": "Back to plan",
+    "seriesDone": "sets",
+    "finishWorkout": "Finish workout",
+    "saving": "Saving...",
+    "saveError": "Couldn't save the workout. Please try again.",
+    "savedTitle": "Workout saved!",
+    "savedBody": "Great job. Your progress has been logged.",
+    "restLabel": "Rest",
+    "restDone": "Done!",
+    "restAdd15": "Add 15 seconds",
+    "restPause": "Pause",
+    "restResume": "Resume",
+    "restSkip": "Skip rest",
+    "suggested": "Suggested",
+    "colSet": "Set",
+    "colWeight": "Weight",
+    "colReps": "Reps",
+    "completeSet": "Complete set"
   },
   "coach": {
     "title": "Coach Kai",
