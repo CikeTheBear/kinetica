@@ -132,6 +132,17 @@ async function generateAndValidatePlan(
 }
 Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de wger.de.`;
 
+  // Semilla de variación: se genera una por cada llamada (cada "Regenerar").
+  // Cumple dos funciones:
+  //  1. Hace que el cuerpo de la petición sea ÚNICO entre regeneraciones. Sin
+  //     esto, dos clicks consecutivos mandaban una petición byte-idéntica y
+  //     OpenRouter/Bedrock devolvía la MISMA completion (el plan no cambiaba: el
+  //     bug que estamos cerrando). El nonce en el prompt + el seed rompen eso.
+  //  2. Le indica al modelo de forma explícita que debe producir una rutina nueva.
+  const variationSeed = Math.floor(Math.random() * 1_000_000_000);
+  const variationInstruction = `\n\nVARIACIÓN (id ${variationSeed}): genera un plan NUEVO y DISTINTO a cualquier plan anterior. Varía la selección de ejercicios del catálogo, su orden y los esquemas de sets/reps. No repitas la misma combinación de ejercicios de otras semanas.`;
+  const userContent = formatInstructions + variationInstruction;
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -146,9 +157,12 @@ Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de w
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: formatInstructions },
+            { role: 'user', content: userContent },
           ],
-          temperature: 0.5,
+          // 0.8: suficiente variedad entre regeneraciones sin que el plan se
+          // vuelva incoherente. seed: varía la petición a nivel de proveedor.
+          temperature: 0.8,
+          seed: variationSeed,
           max_tokens: 4000,
         }),
       });
