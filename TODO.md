@@ -11,7 +11,7 @@
 ## Estado de Git (al cierre)
 
 - Ramas: `main` (principal/versiones), `develop` (desarrollo), features salen de `develop`.
-- Rama actual de trabajo: **`feature/wger-integration`** — tiene 2 commits sobre `develop` pendientes de validar y mergear (la integración de wger y el fix del 409 de regenerar). NO mergear todavía: hay un bug activo en la UI de regeneración (ver abajo).
+- Rama actual de trabajo: **`feature/wger-integration`** — integración de wger + fix del 409 de regenerar + fix de "regenerar no cambiaba el plan" (ver abajo, ya cerrado). Pendiente: commitear el fix, validar a fondo y mergear a `develop`.
 - Modelo LLM en uso: `anthropic/claude-haiku-4.5` (env var `OPENROUTER_DEFAULT_MODEL`).
 
 ---
@@ -60,32 +60,22 @@
 
 ---
 
-## 🐛 BUG ACTIVO — La UI no refresca el plan tras regenerar
+## ✅ CERRADO — "Regenerar no cambiaba el plan"
 
-**Síntoma:** Al darle al botón "Regenerar" en la pestaña Plan, el botón pasa por el estado de carga (~20s) y vuelve a activo, pero el plan que se ve no cambia en nada visualmente.
+**Síntoma original:** al pulsar "Regenerar" en la pestaña Plan, el plan mostrado no cambiaba en nada (ni siquiera los ejercicios al expandir una card).
 
-**Diagnóstico hecho en esta sesión (verificable en código):**
+**Causa raíz (verificada, NO era lo que decía el handoff anterior):** la petición al LLM era **byte-idéntica** entre regeneraciones consecutivas — `temperature: 0.5`, sin nonce de variación ni `seed` (el código real NO tenía la "semilla de variación" que los docs afirmaban). El proveedor (Claude vía Bedrock/OpenRouter) devolvía la **misma completion** ante una petición idéntica → el mismo `plan_json`. No era ni la UI, ni el render de React, ni un Service Worker.
 
-1. **El backend SÍ genera planes nuevos y distintos cada vez.** Confirmado con instrumentación temporal: dos regeneraciones consecutivas produjeron `wger_id` distintos por día (`lun:[1277,1198,...]` vs `lun:[539,1219,...]`).
-2. **El LLM produce variedad real** con `temperature: 0.8` + semilla de variación + instrucción explícita de "no repitas exactamente un plan anterior".
-3. **El plan nuevo se persiste correctamente** en `weekly_plans` (el endpoint devuelve 200 y el insert ocurre — `lib/plan.ts` borra el plan de esa semana y guarda el nuevo).
-4. **El código de `handleGeneratePlan` en `components/plan/weekly-plan-view.tsx` parece correcto a inspección**: hace `setPlan(data.plan)` con la respuesta del POST, y `data.plan` es la fila completa de `weekly_plans` con `plan_json` actualizado.
+**Cómo se diagnosticó:** se instrumentó el **cliente** (paso que el handoff anterior nunca ejecutó) logueando la huella de `wger_id` recibida. Dos regeneraciones daban la huella idéntica `[539,1219,1467,1296,1919]` pese a `cache: 'no-store'` → descartaba caché de navegador/SW y señalaba al backend.
 
-**Por dónde NO está el problema (descartado):**
-- Generación del plan.
-- Validación Zod / del catálogo wger.
-- Persistencia en BD.
-- Shape de la respuesta del endpoint.
+**Fix (`lib/plan.ts`, `generateAndValidatePlan`):**
+- Nonce de variación inyectado en el prompt del usuario + pasado como `seed` → cada regeneración manda una petición ÚNICA.
+- `temperature` subida de 0.5 a 0.8.
+- Instrucción explícita de "genera un plan distinto al anterior".
 
-**Hipótesis pendientes de verificar (en este orden):**
-1. **Caché del navegador o Service Worker antiguo.** El `public/sw.js` actual es un kill-switch benigno (no intercepta fetches), pero un SW de versiones anteriores del proyecto pudo haber cacheado respuestas y seguir interfiriendo. → **Acción**: hard refresh (Ctrl+F5) + DevTools → Application → Service Workers → Unregister + Clear site data + reintentar.
-2. **Si tras hard refresh persiste**, instrumentar el cliente (añadir un `console.log(data)` justo antes del `setPlan` en `handleGeneratePlan`) y ver en DevTools Console si los datos que llegan al cliente sí varían entre regeneraciones. Si llegan distintos pero el render es igual, hay un bug sutil de React (memo/key/referencia). Si llegan iguales pese a que el backend genera distinto, hay caché HTTP/SW.
+Tras el fix, las huellas cambian en cada regeneración (ej. `[1094,1084,1228,1779,1194,1919]` vs `[1119,1082,1471,1307,1572,1921]`) y la UI refresca correctamente.
 
-**Archivos clave a tocar para cerrar el bug:**
-- `components/plan/weekly-plan-view.tsx` (UI, `handleGeneratePlan`)
-- `public/sw.js` y `components/service-worker-register.tsx` (Service Worker)
-- `app/api/plan/active/route.ts` (no cachea, pero verificar)
-- `lib/plan.ts` (backend; ya verificado que funciona — no tocar para arreglar este bug)
+**Mejora defensiva añadida de paso:** `cache: 'no-store'` en los `fetch` del cliente y header `Cache-Control: no-store` en `/api/plan/generate` y `/api/plan/active`.
 
 ---
 

@@ -97,7 +97,7 @@ auth → guardar mensaje user → 3 capas de memoria en paralelo
 ### Generación de plan semanal (`lib/plan.ts`)
 - Función `generatePlanForUser(userId)` reutilizable (endpoint y tool de Kai la llaman).
 - **No usa `response_format: json_schema`**: incompatible con Bedrock/Claude. Pide JSON por prompt y valida con Zod (rangos, enums, longitud 7 días, `wger_id` ∈ catálogo).
-- Reintentos: 3 con backoff. `temperature: 0.8` + semilla de variación para que regenerar dé planes distintos.
+- Reintentos: 3 con backoff. `temperature: 0.8` + **semilla de variación** (nonce inyectado en el prompt del usuario + `seed`) para que cada "Regenerar" mande una petición ÚNICA y el modelo devuelva un plan distinto. Sin esto, dos regeneraciones idénticas obtenían la misma completion (caché/determinismo del proveedor) y el plan no cambiaba.
 - `getNextMonday` usa componentes locales (no `toISOString` → UTC); evita off-by-one en GMT-4.
 - **Regenerar reemplaza el plan de la semana** (no devuelve 409). Genera y valida primero; si el nuevo es válido, borra el anterior e inserta. Si falla, el viejo queda intacto.
 
@@ -120,10 +120,10 @@ auth → guardar mensaje user → 3 capas de memoria en paralelo
 
 ## Estado actual
 
-Casi todo el flujo funciona. Hay **un bug activo**: tras regenerar el plan en la pestaña Plan, la UI no refresca lo que muestra (backend verificado produce planes distintos). Hipótesis: Service Worker antiguo cacheado, o bug sutil de React. Detalle completo y plan de diagnóstico en `docs/ESTADO_ACTUAL.md` § "Bug activo a cerrar". **Tocar `components/plan/weekly-plan-view.tsx`, NO `lib/plan.ts`**.
+Todo el flujo principal funciona. El bug de "regenerar no cambiaba el plan" **está cerrado**: la causa NO era la UI ni un Service Worker, sino que la petición al LLM era byte-idéntica entre regeneraciones (temp 0.5, sin nonce ni `seed`) → el proveedor devolvía la misma completion. Verificado instrumentando el cliente: las huellas de `wger_id` ahora cambian en cada regeneración. Fix en `lib/plan.ts` (ver § "Generación de plan semanal").
 
 Pendientes:
-- Cerrar ese bug → validar → mergear `feature/wger-integration` → `develop`.
+- Validar a fondo → mergear `feature/wger-integration` → `develop`.
 - Siguiente feature recomendada: **"En el Ruedo"** (modo ejecución del entrenamiento con timer).
 - Iconos PWA definitivos (Carlos los hace; ahora hay un SVG placeholder).
 

@@ -7,8 +7,8 @@
 ## TL;DR
 
 - El proyecto está **funcional en su mayor parte**: auth, chat de Kai sin bucle, onboarding determinístico, generación de plan con ejercicios reales de wger.de validados.
-- **Hay un bug activo**: en la pestaña Plan, el botón "Regenerar" llama al backend (que genera y persiste un plan nuevo y distinto cada vez, verificado en log), pero **la UI no refresca lo que muestra**. Tu primera misión es cerrarlo.
-- Estamos en la rama **`feature/wger-integration`** con 2 commits sobre `develop`. NO mergear hasta validar el bug.
+- **El bug de "regenerar no cambiaba el plan" está CERRADO** (ver sección abajo). La causa era backend (petición al LLM idéntica entre regeneraciones), no UI/SW como suponía el handoff anterior.
+- Estamos en la rama **`feature/wger-integration`**. Pendiente: commitear el fix, validar a fondo y mergear a `develop`.
 - Producción: https://kinetica-delta.vercel.app · Supabase: `focbdmounzgaujtirvno`.
 
 ---
@@ -43,60 +43,30 @@ Esta sesión empezó con un proyecto heredado de otro agente que dejó múltiple
 
 ---
 
-## 🐛 Bug activo a cerrar
+## ✅ Bug cerrado — "Regenerar no cambiaba el plan"
 
 ### Síntoma
-En la pestaña Plan (`/[locale]/(dashboard)/plan`), el usuario tiene un plan visible. Pulsa el botón "Regenerar". El botón muestra estado de carga (~20s) y vuelve a activo. **Pero el plan que se muestra en pantalla no cambia en absolutamente nada.**
+En la pestaña Plan, al pulsar "Regenerar" el plan mostrado no cambiaba en nada — ni siquiera los ejercicios concretos al expandir una card.
 
-### Diagnóstico ya hecho (verificable)
+### Causa raíz (la verdadera, distinta a lo que suponía el handoff anterior)
+La petición a OpenRouter en `lib/plan.ts: generateAndValidatePlan` era **byte-idéntica** entre regeneraciones consecutivas: `temperature: 0.5`, mismos `systemPrompt` y `formatInstructions`, **sin nonce ni `seed`**. La "semilla de variación" que las versiones previas de estos docs afirmaban NO existía en el código. Ante una petición idéntica, el proveedor (Claude vía Bedrock) devolvía la **misma completion** → el mismo `plan_json`.
 
-Se añadió instrumentación temporal (`console.log` de los `wger_id` generados) y se confirmó por log que **el backend produce planes distintos en cada regeneración**:
+> Lección: el handoff anterior dio por "confirmado correcto" el backend basándose solo en logs server-side de una sesión, y marcó la UI/SW como sospechosos. La instrumentación del **cliente** (que nunca se llegó a ejecutar) era el paso decisivo y apuntó directo al backend.
 
-```
-1ª  lun:[1277,1198,1228,1270,1713] mar:[1186,154,1225,1473,1394] ...
-2ª  lun:[539,1219,1467,1296,1919]  mar:[1471,1542,1192,1458,1399] ...
-```
+### Cómo se diagnosticó esta vez
+1. Se añadió `cache: 'no-store'` a los fetch del cliente + header `Cache-Control: no-store` a los endpoints (descarta caché de navegador/SW de raíz).
+2. Se instrumentó el cliente logueando la huella de `wger_id` recibida en `handleGeneratePlan`.
+3. Dos regeneraciones daban la **misma** huella `[539,1219,1467,1296,1919]` pese al `no-store` → el problema no era la red ni el render, sino que el backend devolvía lo mismo.
 
-También:
-- `POST /api/plan/generate 200` con duración ~20s (el LLM corre de verdad).
-- Sin errores `[plan]` en el log: el plan pasa Zod y la validación de `wger_id` contra el catálogo.
-- El endpoint devuelve `{ success: true, plan: insertedPlan, message }`, donde `insertedPlan` es la fila completa de `weekly_plans` con `plan_json` actualizado.
+### Fix aplicado (`lib/plan.ts`)
+- Nonce de variación (`variationSeed`) inyectado en el prompt del usuario + pasado como `seed` → cada regeneración manda una petición ÚNICA (rompe caché/determinismo del proveedor).
+- `temperature` 0.5 → 0.8.
+- Instrucción explícita al modelo de generar un plan distinto al anterior.
 
-La instrumentación de debug se revirtió antes de cerrar la sesión. El código está limpio.
+Verificado: tras el fix las huellas cambian en cada regeneración y la UI refresca.
 
-### Hipótesis pendientes (en orden de probabilidad)
-
-**1. Caché del navegador / Service Worker antiguo.**
-
-El SW actual (`public/sw.js`) es un kill-switch benigno (no intercepta fetches). Pero si Carlos tiene un SW de versiones anteriores del proyecto registrado en su navegador, podría seguir interceptando o cacheando.
-
-**Cómo descartarlo (acción de Carlos):**
-1. F12 → Application → Service Workers → `Unregister` cualquier SW activo.
-2. F12 → Application → Clear storage → Clear site data.
-3. Ctrl+F5 (hard reload).
-4. Regenerar el plan. Si funciona, era el SW residual.
-
-**2. Bug sutil de React en el render.**
-
-Si tras hard refresh el bug persiste, el siguiente paso es **instrumentar el cliente**. Añadir en `components/plan/weekly-plan-view.tsx`, dentro de `handleGeneratePlan`, justo antes del `setPlan(data.plan)`:
-
-```ts
-console.log('[plan][client] data recibido:', data);
-console.log('[plan][client] huella lunes:', data?.plan?.plan_json?.dias?.[0]?.ejercicios?.map(e => e.wger_id));
-```
-
-Pedir a Carlos que regenere 2 veces con DevTools Console abierto.
-
-- Si las dos huellas en consola son **distintas** → la UI recibe planes diferentes pero el render no los pinta. Probable causa: las `key={dia.dia}` de los `DayCard` (siempre lunes..domingo) hacen que React reutilice los componentes; alguna referencia interna podría estar atascada. Investigar: forzar nueva key añadiendo el `id` del plan (`key={\`${plan.id}-${dia.dia}\`}`), o un `React.useEffect` que reaccione a cambios en `plan.id`.
-- Si las dos huellas son **idénticas** → el navegador está cacheando la respuesta del POST de alguna forma. Investigar headers de respuesta de `/api/plan/generate` (añadir `Cache-Control: no-store`) o el SW.
-
-### Archivos clave para este bug
-
-- `components/plan/weekly-plan-view.tsx` — la UI.
-- `app/api/plan/generate/route.ts` — el endpoint que devuelve el plan nuevo.
-- `app/api/plan/active/route.ts` — endpoint que carga el plan al montar.
-- `public/sw.js`, `components/service-worker-register.tsx` — Service Worker.
-- `lib/plan.ts` — **NO tocar para este bug** (el backend ya está confirmado correcto).
+### Instrumentación
+La instrumentación temporal del cliente ya se revirtió. Los `cache: 'no-store'` se dejaron como mejora defensiva permanente.
 
 ---
 
