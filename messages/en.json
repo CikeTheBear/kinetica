@@ -27,6 +27,20 @@
     "onboardingBody": "Tell Kai your goal, availability and equipment, and he'll generate your personalized training plan.",
     "onboardingCta": "Chat with Kai"
   },
+  "progress": {
+    "title": "Your progress",
+    "emptyTitle": "No progress to show yet",
+    "emptyBody": "Log your first workout from the Plan tab and you'll see your evolution here.",
+    "statWorkouts": "Workouts",
+    "statVolume": "Volume",
+    "statStreak": "Streak",
+    "streakUnit": "wk",
+    "volumeTitle": "Volume per session",
+    "volumeSubtitle": "Kg lifted in your latest sessions",
+    "frequencyTitle": "Weekly frequency",
+    "frequencySubtitle": "Workouts per week",
+    "workoutsUnit": "workouts"
+  },
   "plan": {
     "title": "Weekly plan",
     "emptyState": "You don't have an active plan. Ask Kai to generate one.",
