@@ -1,4 +1,4 @@
-# TODO — Kinética (Estado REAL al 28 May 2026)
+# TODO — Kinética (Estado REAL al 29 May 2026)
 
 > Estado real del proyecto al cierre de la sesión con Vertex (Claude). Léelo entero antes de tocar nada — explica qué funciona, qué está roto y por dónde seguir.
 > ✅ Funciona · 🐛 Roto · ⏳ No implementado · ⚠️ Parcial / temporalmente desactivado
@@ -11,7 +11,8 @@
 ## Estado de Git (al cierre)
 
 - Ramas: `main` (principal/versiones), `develop` (desarrollo), features salen de `develop`.
-- Rama actual de trabajo: **`feature/wger-integration`** — integración de wger + fix del 409 de regenerar + fix de "regenerar no cambiaba el plan" (ver abajo, ya cerrado). Pendiente: commitear el fix, validar a fondo y mergear a `develop`.
+- `feature/wger-integration` ya está **mergeada en `develop`** (integración wger + fix del 409 + fix de "regenerar no cambiaba el plan", ya pusheado a origin).
+- Rama actual de trabajo: **`feature/en-el-ruedo`** — modo de ejecución del entrenamiento, ya implementado y validado (1 commit). Pendiente: mergear a `develop`. Hay además un commit `chore` de config de ESLint en `develop` sin pushear.
 - Modelo LLM en uso: `anthropic/claude-haiku-4.5` (env var `OPENROUTER_DEFAULT_MODEL`).
 
 ---
@@ -53,6 +54,15 @@
   - El LLM elige SOLO de los `wger_id` del catálogo que se le pasa; validación dura post-Zod (si inventa un ID, reintenta).
 - [x] Regenerar plan reemplaza el de la semana (borra el anterior solo si el nuevo es válido; antes devolvía 409).
 
+### En el Ruedo (modo de ejecución del entrenamiento)
+- [x] Ruta `/[locale]/ruedo/[dia]` (server component: auth, carga plan activo, valida día, redirige a `/plan` si no aplica).
+- [x] Series pre-rellenadas desde los objetivos del plan (peso sugerido + reps objetivo parseadas).
+- [x] Steppers grandes +/- de peso (paso 2.5 kg) y reps; marcar serie completada.
+- [x] Timer de descanso flotante al completar serie (pausar, +15s, saltar, vibración al terminar).
+- [x] Autosave en `localStorage` (borrador por plan+día, con firma de ejercicios para invalidar si se regenera el plan).
+- [x] `POST /api/workout/log` con validación Zod, idempotente por día → escribe en `workout_logs` (una fila por ejercicio, series en `jsonb`).
+- [x] Botón "Entrenar" por día de entreno en la pestaña Plan. i18n es/en.
+
 ### Backend / Infra
 - [x] Supabase (`focbdmounzgaujtirvno`) con RLS en todas las tablas.
 - [x] Tests vitest: 11 casos sobre `isOnboardingDataComplete` en verde.
@@ -90,16 +100,11 @@ Tras el fix, las huellas cambian en cada regeneración (ej. `[1094,1084,1228,177
 
 ## ⏳ NO IMPLEMENTADO (próximos sprints)
 
-### Cuando se cierre el bug de UI y se mergee `feature/wger-integration` → `develop`:
-
-**Siguiente feature recomendada: "En el Ruedo" (modo de ejecución del entrenamiento).**
-- Vista del día actual con los ejercicios (ya tienen `wger_id` reales tras la integración wger).
-- Inputs grandes +/- para peso y reps.
-- Botón "completar serie" → temporizador de descanso flotante.
-- Persistir en `workout_logs`.
+**Siguiente feature recomendada: gráficas de progreso en Dashboard.** Ahora "En el Ruedo" ya escribe en `workout_logs`, así que por fin hay datos reales que graficar (peso/volumen por ejercicio, series completadas, etc.).
 
 ### Resto del backlog
-- [ ] Gráficas de progreso en Dashboard.
+- [ ] Gráficas de progreso en Dashboard (desbloqueado por los datos de `workout_logs`).
+- [ ] Mejoras a "En el Ruedo" v2: guardado incremental por serie (no solo al finalizar), modo immersive sin bottom nav, notas por ejercicio, historial de entrenos pasados.
 - [ ] Importación de datos de salud (Apple Health XML, CSV báscula, PDF).
 - [ ] Videos de ejercicios (YouTube Data API v3) — ahora factible con `wger_id` reales.
 - [ ] Notificaciones push (Web Push) + cron de mensajes proactivos de Kai.
