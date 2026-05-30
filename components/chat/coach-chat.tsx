@@ -96,7 +96,7 @@ export function CoachChat() {
         onSubmit={handleSubmit}
         className="border-t border-border-subtle bg-bg-elevated/90 px-4 pb-20 pt-3 backdrop-blur-md md:pb-3"
       >
-        <div className="mx-auto flex max-w-md items-end gap-2 rounded-2xl border border-border-default bg-bg-overlay px-4 py-2">
+        <div className="flex w-full items-center gap-2 rounded-2xl border border-border-default bg-bg-overlay px-3 py-1.5">
           <textarea
             ref={textareaRef}
             value={inputValue}
@@ -106,7 +106,7 @@ export function CoachChat() {
             placeholder={t('placeholder')}
             disabled={isLoading}
             rows={1}
-            className="flex-1 max-h-[120px] resize-none bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+            className="flex-1 max-h-[120px] resize-none self-center bg-transparent py-1.5 text-sm leading-5 text-text-primary placeholder:text-text-muted focus:outline-none"
           />
           <button
             type="submit"
@@ -120,7 +120,7 @@ export function CoachChat() {
             )}
           </button>
         </div>
-        <p className="mx-auto mt-1 max-w-md text-center text-[10px] text-text-muted">
+        <p className="mt-1 text-center text-[10px] text-text-muted">
           {t('inputHint')}
         </p>
       </form>
