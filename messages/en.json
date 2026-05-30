@@ -17,7 +17,9 @@
     "registerButton": "Create account",
     "noAccount": "Don't have an account?",
     "hasAccount": "Already have an account?",
-    "logout": "Log out"
+    "logout": "Log out",
+    "loginSubtitle": "Log in to keep training",
+    "registerSubtitle": "Create your account and start with Kai"
   },
   "dashboard": {
     "title": "Dashboard",

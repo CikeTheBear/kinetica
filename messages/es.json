@@ -17,7 +17,9 @@
     "registerButton": "Crear cuenta",
     "noAccount": "¿No tienes cuenta?",
     "hasAccount": "¿Ya tienes cuenta?",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "loginSubtitle": "Entra a tu cuenta para seguir entrenando",
+    "registerSubtitle": "Crea tu cuenta y empieza con Kai"
   },
   "dashboard": {
     "title": "Dashboard",
