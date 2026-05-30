@@ -127,13 +127,20 @@ Pendientes:
 - Siguiente feature recomendada: **"En el Ruedo"** (modo ejecución del entrenamiento con timer).
 - Iconos PWA definitivos (Carlos los hace; ahora hay un SVG placeholder).
 
-## Design system — reglas con trampa
+## Design system — sistema de temas (¡cambió!)
 
-- Accent `#E5FF00` (amarillo nitro). **Texto sobre accent SIEMPRE `#0A0E14`** — usa la clase `text-on-accent`, nunca blanco.
-- Éxito/verde es `#4ADE80` (`status-success`), **no** el accent.
-- Dark mode first. Modo claro es v2 — no añadir variantes `light:`.
-- `Inter` para UI, `JetBrains Mono` para números/métricas (variables de `next/font` en `layout.tsx`).
+La app tiene **dos temas seleccionables en Ajustes**: `redline` (default, telemetría de motorsport) y `kinetic` (poster atlético). Ambos dark. El usuario elige en `/settings`.
+
+- **Tokens = CSS variables, NO hex hardcodeados.** `tailwind.config.ts` mapea los tokens semánticos (`bg-base`, `text-primary`, `accent`, `accent-2`, `on-accent`...) a `var(--token)`. Cada tema define su paleta bajo `[data-theme="redline"]` / `[data-theme="kinetic"]` en `app/globals.css`. **Nunca pongas un color hex en una clase** (`text-[#...]`); usa el token (`text-on-accent`, etc.).
+- **Switching**: `next-themes` con `attribute="data-theme"`, default `redline`, sin FOUC (script inline). Provider en `components/theme-provider.tsx`, montado en `app/[locale]/layout.tsx`.
+- **Tipografía por roles**, no fuentes fijas. Variables `--font-display / --font-body / --font-mono` que cada tema mapea: redline = Saira + Hanken + Martian Mono; kinetic = Anton + Hanken + Martian Mono (cargadas con `next/font` en el layout). Usa las clases `t-display` (titulares; aplica fuente+peso+tracking del tema), `font-mono-metrics` (números/datos) y la `sans` por defecto (body).
+- **Accent** `#E5FF00` (amarillo nitro) constante en ambos temas. `accent-2` varía: rojo redline / magenta kinetic. Texto sobre accent SIEMPRE oscuro → `text-on-accent`.
+- Éxito/verde `#4ADE80` (`status-success`), **no** el accent.
+- Dark only (sin variantes `light:`).
+- **Divergencias bespoke por tema**: cuando el layout difiere de verdad (ej. Dashboard), se renderizan **dos variantes** y CSS muestra la activa con las utilidades `.only-redline` / `.only-kinetic`. El 70% lo cubren los tokens; solo se duplica cuando la estructura cambia.
+- **Shell responsive**: `Sidebar` (desktop) + `BottomNav` (móvil, `md:hidden`) comparten `components/nav/nav-config.ts`. El contenido de cada página se centra con `<PageContainer>` (`max-w-3xl`); el Coach gestiona su propia altura. No estirar de extremo a extremo en desktop.
 - `lucide-react` con peso 1.5 para iconos.
+- Exploración de las direcciones de diseño en `design/showcase.html`.
 
 ## Bloques especiales de Kai en markdown
 
