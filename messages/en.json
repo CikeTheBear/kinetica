@@ -39,7 +39,13 @@
     "volumeSubtitle": "Kg lifted in your latest sessions",
     "frequencyTitle": "Weekly frequency",
     "frequencySubtitle": "Workouts per week",
-    "workoutsUnit": "workouts"
+    "workoutsUnit": "workouts",
+    "thisWeek": "This week",
+    "vsPrevWeek": "vs. previous week",
+    "planWeek": "Plan · this week",
+    "restDay": "Rest",
+    "train": "Train",
+    "today": "Today"
   },
   "plan": {
     "title": "Weekly plan",
@@ -79,6 +85,14 @@
     "placeholder": "Type a message...",
     "emptyState": "You'll chat with Kai, your personal coach, here.",
     "inputHint": "Enter to send · Shift+Enter for new line"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "theme_redline": "Redline",
+    "theme_redline_desc": "High-performance telemetry. Sober, technical, precise.",
+    "theme_kinetic": "Kinetic",
+    "theme_kinetic_desc": "Athletic poster. Vibrant, motivating, full of energy."
   },
   "disclaimer": {
     "title": "Important medical notice",

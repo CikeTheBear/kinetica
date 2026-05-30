@@ -39,7 +39,13 @@
     "volumeSubtitle": "Kg levantados en tus últimas sesiones",
     "frequencyTitle": "Frecuencia semanal",
     "frequencySubtitle": "Entrenos por semana",
-    "workoutsUnit": "entrenos"
+    "workoutsUnit": "entrenos",
+    "thisWeek": "Esta semana",
+    "vsPrevWeek": "vs. semana previa",
+    "planWeek": "Plan · esta semana",
+    "restDay": "Descanso",
+    "train": "Entrenar",
+    "today": "Hoy"
   },
   "plan": {
     "title": "Plan semanal",
@@ -79,6 +85,14 @@
     "placeholder": "Escribe un mensaje...",
     "emptyState": "Aquí hablarás con Kai, tu coach personal.",
     "inputHint": "Enter para enviar · Shift+Enter para nueva línea"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "appearance": "Apariencia",
+    "theme_redline": "Redline",
+    "theme_redline_desc": "Telemetría de alto rendimiento. Sobrio, técnico, preciso.",
+    "theme_kinetic": "Kinetic",
+    "theme_kinetic_desc": "Poster atlético. Vibrante, motivador, con energía."
   },
   "disclaimer": {
     "title": "Aviso médico importante",
