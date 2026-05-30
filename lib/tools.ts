@@ -46,6 +46,65 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'query_progress_summary',
+      description:
+        'Consulta un resumen del progreso de entrenamiento del usuario (entrenos registrados, volumen total levantado, racha de semanas y frecuencia semanal). Úsalo cuando el usuario pregunte cómo va, su progreso, su volumen, su constancia o quiera feedback sobre sus entrenos.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'register_injury',
+      description:
+        'Registra una lesión o limitación activa del usuario. Úsalo cuando el usuario mencione una molestia, dolor o lesión que deba tenerse en cuenta al entrenar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          zona: {
+            type: 'string',
+            description:
+              'Zona del cuerpo afectada, ej. "hombro derecho", "lumbar", "rodilla izquierda".',
+          },
+          nota: {
+            type: 'string',
+            description:
+              'Detalle opcional: tipo de molestia, contexto, o qué movimientos la agravan.',
+          },
+          severidad: {
+            type: 'string',
+            description: 'Severidad opcional. Una de: "leve", "moderada", "alta".',
+          },
+        },
+        required: ['zona'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'resolve_injury',
+      description:
+        'Marca una lesión activa como resuelta y la quita de las limitaciones del usuario. Úsalo cuando el usuario confirme que una lesión ya está recuperada o ya no le molesta.',
+      parameters: {
+        type: 'object',
+        properties: {
+          zona: {
+            type: 'string',
+            description:
+              'Zona de la lesión a resolver. Puede coincidir parcialmente con una lesión activa, ej. "hombro" resolvería "hombro derecho".',
+          },
+        },
+        required: ['zona'],
+      },
+    },
+  },
 ];
 
 /**
@@ -64,6 +123,17 @@ export async function executeTool(
     case 'generate_weekly_plan': {
       return generateWeeklyPlan(userId);
     }
+    case 'query_progress_summary': {
+      return queryProgressSummary(userId);
+    }
+    case 'register_injury': {
+      const a = args as { zona: string; nota?: string; severidad?: string };
+      return registerInjury(a, userId);
+    }
+    case 'resolve_injury': {
+      const a = args as { zona: string };
+      return resolveInjury(a, userId);
+    }
     default:
       return `Tool desconocida: ${toolName}`;
   }
@@ -72,6 +142,11 @@ export async function executeTool(
 import { createClient } from '@/lib/supabase/server';
 import { isOnboardingDataComplete } from '@/lib/onboarding';
 import { generatePlanForUser } from '@/lib/plan';
+import {
+  computeProgress,
+  formatProgressSummary,
+  type WorkoutLogRow,
+} from '@/lib/progress';
 
 async function updateUserProfile(
   args: { field: string; value: string },
@@ -141,4 +216,116 @@ async function generateWeeklyPlan(userId: string): Promise<string> {
   } catch (error) {
     return `Error generando plan: ${(error as Error).message}`;
   }
+}
+
+/** Fecha de hoy como YYYY-MM-DD en componentes locales. */
+function hoyISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+async function queryProgressSummary(userId: string): Promise<string> {
+  const supabase = createClient();
+
+  // Locale del usuario para que el resumen vaya en su idioma.
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('locale')
+    .eq('id', userId)
+    .single();
+
+  const { data: logs } = await supabase
+    .from('workout_logs')
+    .select('fecha, ejercicio_nombre, sets')
+    .eq('user_id', userId);
+
+  const rows = (logs ?? []) as WorkoutLogRow[];
+  const data = computeProgress(rows);
+  return formatProgressSummary(data, profile?.locale || 'es');
+}
+
+async function registerInjury(
+  args: { zona: string; nota?: string; severidad?: string },
+  userId: string
+): Promise<string> {
+  const supabase = createClient();
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('metadata_biometrica')
+    .eq('id', userId)
+    .single();
+
+  const metadata = (profile?.metadata_biometrica || {}) as Record<string, unknown>;
+  const lesiones = Array.isArray(metadata.lesiones_activas)
+    ? [...(metadata.lesiones_activas as unknown[])]
+    : [];
+
+  lesiones.push({
+    zona: args.zona,
+    nota: args.nota || null,
+    severidad: args.severidad || null,
+    desde: hoyISO(),
+  });
+  metadata.lesiones_activas = lesiones;
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ metadata_biometrica: metadata })
+    .eq('id', userId);
+
+  if (error) {
+    return `Error registrando la lesión: ${error.message}`;
+  }
+
+  return `Lesión registrada y activa: ${args.zona}. Se tendrá en cuenta al generar o ajustar el plan. Puedes ofrecer al usuario regenerar su plan para adaptarlo a esta limitación.`;
+}
+
+async function resolveInjury(
+  args: { zona: string },
+  userId: string
+): Promise<string> {
+  const supabase = createClient();
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('metadata_biometrica')
+    .eq('id', userId)
+    .single();
+
+  const metadata = (profile?.metadata_biometrica || {}) as Record<string, unknown>;
+  const lesiones = Array.isArray(metadata.lesiones_activas)
+    ? (metadata.lesiones_activas as unknown[])
+    : [];
+
+  // Match flexible por zona: tolera entradas como string (de onboarding) o como
+  // objeto { zona, ... } (las que escribe register_injury).
+  const zonaBuscada = args.zona.toLowerCase();
+  const restantes = lesiones.filter((l) => {
+    const zona =
+      typeof l === 'string'
+        ? l
+        : ((l as { zona?: string })?.zona ?? '');
+    return !zona.toLowerCase().includes(zonaBuscada);
+  });
+
+  if (restantes.length === lesiones.length) {
+    return `No encontré ninguna lesión activa que coincida con "${args.zona}". Lesiones activas actuales: ${JSON.stringify(lesiones)}`;
+  }
+
+  metadata.lesiones_activas = restantes;
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ metadata_biometrica: metadata })
+    .eq('id', userId);
+
+  if (error) {
+    return `Error resolviendo la lesión: ${error.message}`;
+  }
+
+  return `Lesión resuelta y quitada de las limitaciones: ${args.zona}. Si el usuario quiere, puedes ofrecer regenerar el plan ahora que esa restricción ya no aplica.`;
 }

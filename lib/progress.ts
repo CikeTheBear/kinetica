@@ -165,6 +165,59 @@ function calcularRacha(semanasConEntreno: string[], semanaActual: string): numbe
   return racha;
 }
 
+/**
+ * Resume los datos de progreso en un texto compacto pensado para que Kai (el LLM)
+ * lo lea y lo reformule al usuario. NO es UI: es contexto para el modelo, así que
+ * va en lenguaje natural con las cifras clave.
+ */
+export function formatProgressSummary(data: ProgressData, locale = 'es'): string {
+  const en = locale === 'en';
+  const { summary, volumenPorSesion, frecuenciaSemanal } = data;
+
+  if (summary.totalEntrenos === 0) {
+    return en
+      ? 'The user has not logged any workouts yet. Encourage them to start and log one from the Plan tab.'
+      : 'El usuario aún no ha registrado ningún entrenamiento. Anímale a empezar y registrar uno desde la pestaña Plan.';
+  }
+
+  const fmtFecha = (fecha: string) => {
+    const [y, m, d] = fecha.split('-').map((n) => parseInt(n, 10));
+    return new Date(y, m - 1, d).toLocaleDateString(en ? 'en-US' : 'es-ES', {
+      day: 'numeric',
+      month: 'short',
+    });
+  };
+
+  const ultima = volumenPorSesion[volumenPorSesion.length - 1];
+  // Frecuencia de las últimas 4 semanas (las más recientes del array).
+  const ultimasSemanas = frecuenciaSemanal
+    .slice(-4)
+    .map((s) => `${fmtFecha(s.semanaInicio)}: ${s.entrenos}`)
+    .join(', ');
+
+  if (en) {
+    return [
+      `Workouts logged: ${summary.totalEntrenos}`,
+      `Total accumulated volume: ${summary.volumenTotalKg} kg`,
+      `Current streak: ${summary.rachaSemanas} week(s)`,
+      ultima ? `Last session: ${fmtFecha(ultima.fecha)} (${ultima.volumenKg} kg)` : '',
+      `Workouts per week (last 4): ${ultimasSemanas}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return [
+    `Entrenos registrados: ${summary.totalEntrenos}`,
+    `Volumen total acumulado: ${summary.volumenTotalKg} kg`,
+    `Racha actual: ${summary.rachaSemanas} semana(s)`,
+    ultima ? `Última sesión: ${fmtFecha(ultima.fecha)} (${ultima.volumenKg} kg)` : '',
+    `Entrenos por semana (últimas 4): ${ultimasSemanas}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 /** Hoy como YYYY-MM-DD en componentes locales. */
 function hoyLocal(): string {
   const d = new Date();
