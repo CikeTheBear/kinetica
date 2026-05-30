@@ -19,6 +19,8 @@ export interface WorkoutLogRow {
 export interface ProgressSummary {
   totalEntrenos: number; // días distintos con al menos una serie completada
   volumenTotalKg: number; // ∑ peso_kg * reps de todas las series completadas
+  volumenSemanaKg: number; // volumen de la semana actual (lunes→domingo)
+  deltaPct: number | null; // % de cambio vs. la semana previa (null si no hay previa)
   rachaSemanas: number; // semanas consecutivas (hasta la más reciente) con entreno
 }
 
@@ -129,6 +131,19 @@ export function computeProgress(
     });
   }
 
+  // Volumen agregado por semana (para el volumen semanal y el delta).
+  const volumenPorSemana = new Map<string, number>();
+  for (const [fecha, vol] of Array.from(volumenPorFecha.entries())) {
+    const semana = getWeekStart(fecha);
+    volumenPorSemana.set(semana, (volumenPorSemana.get(semana) ?? 0) + vol);
+  }
+  const volumenSemanaKg = Math.round(volumenPorSemana.get(semanaActual) ?? 0);
+  const volumenPrevia = volumenPorSemana.get(restarSemanas(semanaActual, 1)) ?? 0;
+  const deltaPct =
+    volumenPrevia > 0
+      ? Math.round(((volumenSemanaKg - volumenPrevia) / volumenPrevia) * 100)
+      : null;
+
   // Resumen.
   const volumenTotalKg = Math.round(
     rows.reduce((acc, row) => acc + volumenFila(row), 0)
@@ -137,7 +152,7 @@ export function computeProgress(
   const rachaSemanas = calcularRacha(Array.from(diasPorSemana.keys()), semanaActual);
 
   return {
-    summary: { totalEntrenos, volumenTotalKg, rachaSemanas },
+    summary: { totalEntrenos, volumenTotalKg, volumenSemanaKg, deltaPct, rachaSemanas },
     volumenPorSesion,
     frecuenciaSemanal,
   };
