@@ -27,7 +27,7 @@ export function ChatMessageBubble({ content, role, isStreaming }: ChatMessagePro
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-3 ${
           role === 'user'
-            ? 'bg-accent text-[#0A0E14]'
+            ? 'bg-accent text-on-accent'
             : 'bg-bg-elevated text-text-primary'
         }`}
       >
