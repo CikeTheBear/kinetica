@@ -11,8 +11,8 @@
 ## Estado de Git (al cierre)
 
 - Ramas: `main` (principal/versiones), `develop` (desarrollo), features salen de `develop`.
-- `feature/wger-integration` ya está **mergeada en `develop`** (integración wger + fix del 409 + fix de "regenerar no cambiaba el plan", ya pusheado a origin).
-- Rama actual de trabajo: **`feature/en-el-ruedo`** — modo de ejecución del entrenamiento, ya implementado y validado (1 commit). Pendiente: mergear a `develop`. Hay además un commit `chore` de config de ESLint en `develop` sin pushear.
+- **`develop` está al día y pusheado a origin.** Integra todo lo de esta sesión: fix de regeneración de plan + integración wger, ESLint, "En el Ruedo", gráficas de progreso y las tools de Kai. No hay ramas de feature abiertas (se mergearon y borraron).
+- **`main` sigue en una versión anterior** — pendiente un release `develop` → `main` cuando se decida.
 - Modelo LLM en uso: `anthropic/claude-haiku-4.5` (env var `OPENROUTER_DEFAULT_MODEL`).
 
 ---
@@ -63,9 +63,20 @@
 - [x] `POST /api/workout/log` con validación Zod, idempotente por día → escribe en `workout_logs` (una fila por ejercicio, series en `jsonb`).
 - [x] Botón "Entrenar" por día de entreno en la pestaña Plan. i18n es/en.
 
+### Gráficas de progreso (Dashboard)
+- [x] `lib/progress.ts`: agregación pura de `workout_logs` (volumen = ∑ peso×reps de series completadas, entrenos, racha de semanas, frecuencia semanal). Con tests (`tests/progress.test.ts`).
+- [x] Dashboard consulta `workout_logs`, agrega y muestra tarjetas de resumen (entrenos / volumen / racha) + gráficas; empty state si aún no hay entrenos.
+- [x] `components/dashboard/progress-charts.tsx`: gráficas con **Recharts** (volumen por sesión, frecuencia semanal) tematizadas con el design system. i18n es/en.
+
+### Tools de Kai (coach que actúa)
+- [x] `query_progress_summary`: Kai resume entrenos/volumen/racha/frecuencia con datos reales (reusa `computeProgress` + `formatProgressSummary`).
+- [x] `register_injury` / `resolve_injury`: escriben `metadata_biometrica.lesiones_activas` (match flexible string/objeto para convivir con datos del onboarding). Verificado en BD.
+- [x] System prompt del modo coach ampliado para indicar cuándo llamarlas. Schemas Bedrock-safe.
+
 ### Backend / Infra
 - [x] Supabase (`focbdmounzgaujtirvno`) con RLS en todas las tablas.
-- [x] Tests vitest: 11 casos sobre `isOnboardingDataComplete` en verde.
+- [x] Tests vitest: 20 casos en verde (`isOnboardingDataComplete` + agregación de progreso en `lib/progress.ts`).
+- [x] ESLint configurado (`next/core-web-vitals`); `npm run lint` pasa limpio.
 - [x] Typecheck limpio.
 
 ---
@@ -100,15 +111,15 @@ Tras el fix, las huellas cambian en cada regeneración (ej. `[1094,1084,1228,177
 
 ## ⏳ NO IMPLEMENTADO (próximos sprints)
 
-**Siguiente feature recomendada: gráficas de progreso en Dashboard.** Ahora "En el Ruedo" ya escribe en `workout_logs`, así que por fin hay datos reales que graficar (peso/volumen por ejercicio, series completadas, etc.).
+**Candidatas a siguiente feature** (sin orden fijo): `modify_current_plan` (la tool que dejamos fuera: mutar el `plan_json` ejercicio a ejercicio + revalidar contra el catálogo wger — la más delicada), videos de ejercicios, o importación de datos de salud.
 
 ### Resto del backlog
-- [ ] Gráficas de progreso en Dashboard (desbloqueado por los datos de `workout_logs`).
+- [ ] Tool `modify_current_plan` de Kai (modificar el plan activo sin regenerarlo entero; revalidar `wger_id` contra el catálogo).
+- [ ] Otras tools de Kai: `log_biometric_entry`, `log_health_metric`.
 - [ ] Mejoras a "En el Ruedo" v2: guardado incremental por serie (no solo al finalizar), modo immersive sin bottom nav, notas por ejercicio, historial de entrenos pasados.
-- [ ] Importación de datos de salud (Apple Health XML, CSV báscula, PDF).
+- [ ] Importación de datos de salud (Apple Health XML, CSV báscula, PDF) → llena `biometrics_history` y desbloquea gráficas de peso/composición.
 - [ ] Videos de ejercicios (YouTube Data API v3) — ahora factible con `wger_id` reales.
 - [ ] Notificaciones push (Web Push) + cron de mensajes proactivos de Kai.
-- [ ] Tools de Kai: `modify_current_plan`, `register_injury`, `resolve_injury`, `log_biometric_entry`, `log_health_metric`, `query_progress_summary`.
 - [ ] Observabilidad: Sentry, PostHog.
 - [ ] Cron en Vercel para resincronizar `exercises_cache` periódicamente.
 - [ ] Ampliar tests (parser de salud, validadores, tools que mutan datos, 1 happy path E2E).

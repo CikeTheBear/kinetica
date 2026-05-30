@@ -8,8 +8,9 @@
 
 - El proyecto está **funcional en su mayor parte**: auth, chat de Kai sin bucle, onboarding determinístico, generación de plan con ejercicios reales de wger.de validados.
 - **El bug de "regenerar no cambiaba el plan" está CERRADO** (ver sección abajo). La causa era backend (petición al LLM idéntica entre regeneraciones), no UI/SW como suponía el handoff anterior.
-- Estamos en la rama **`feature/wger-integration`**. Pendiente: commitear el fix, validar a fondo y mergear a `develop`.
-- Producción: https://kinetica-delta.vercel.app · Supabase: `focbdmounzgaujtirvno`.
+- **Features añadidas en esta sesión** (todas en `develop`, pusheadas): "En el Ruedo" (ejecución del entreno → `workout_logs`), gráficas de progreso en el Dashboard (Recharts + `lib/progress.ts`), y tools de Kai (`query_progress_summary`, `register_injury`, `resolve_injury`). Además se configuró ESLint.
+- **Git**: `develop` está al día y pusheado; no hay ramas de feature abiertas. `main` sigue en una versión anterior (pendiente release `develop` → `main`).
+- Producción: https://kinetica-delta.vercel.app · Supabase: `focbdmounzgaujtirvno`. **Ojo: producción despliega de `main`, así que lo nuevo de esta sesión aún NO está en producción** hasta que se haga el release.
 
 ---
 
@@ -79,18 +80,22 @@ app/
 │   ├── plan/
 │   │   ├── generate/route.ts  # POST: delega en generatePlanForUser
 │   │   └── active/route.ts    # GET: plan activo del usuario
+│   ├── workout/
+│   │   └── log/route.ts       # POST: persiste el entreno ejecutado (workout_logs)
 │   └── admin/
 │       └── sync-exercises/route.ts  # POST protegido con SYNC_SECRET
 ├── actions/auth.ts             # signUp/signIn/signOut (devuelven redirectTo, no redirect())
 └── [locale]/                   # i18n routing (next-intl, localePrefix 'always')
     ├── (auth)/login, register
-    ├── (dashboard)/dashboard, plan, coach
+    ├── (dashboard)/dashboard, plan, coach, ruedo/[dia]
     └── disclaimer/             # server component con guard
 
 lib/
-├── plan.ts                     # ⭐ generación de plan (Zod, retries, catálogo wger)
+├── plan.ts                     # ⭐ generación de plan (Zod, retries, catálogo wger, nonce de variación)
 ├── wger.ts                     # ⭐ cliente wger + sync + getCatalogForUser
-├── tools.ts                    # tools de Kai (update_user_profile, generate_weekly_plan)
+├── workout.ts                  # tipos + helpers de "En el Ruedo" (parseReps, getFechaForDia)
+├── progress.ts                 # agregación de workout_logs + formatProgressSummary (con tests)
+├── tools.ts                    # tools de Kai (update_user_profile, generate_weekly_plan, query_progress_summary, register_injury, resolve_injury)
 ├── memory.ts                   # 3 capas de memoria para Kai
 ├── onboarding.ts               # isOnboardingDataComplete (determinístico)
 ├── auth.ts                     # requireUser
@@ -101,7 +106,9 @@ lib/
 
 components/
 ├── chat/coach-chat.tsx, use-chat-stream.ts, chat-message.tsx, markdown-renderer.tsx
-├── plan/weekly-plan-view.tsx   # ⭐ AQUÍ está el bug activo
+├── plan/weekly-plan-view.tsx   # vista del plan + botón "Entrenar"
+├── ruedo/ruedo-view.tsx, exercise-tracker.tsx, rest-timer.tsx  # "En el Ruedo"
+├── dashboard/progress-charts.tsx  # gráficas de progreso (Recharts)
 ├── auth/login-form, register-form, user-menu
 └── bottom-nav.tsx, service-worker-register.tsx
 ```
