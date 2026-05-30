@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame } from 'lucide-react';
+import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame, Play } from 'lucide-react';
+import { Link } from '@/navigation';
 import { cn } from '@/lib/utils';
+import { PageContainer } from '@/components/page-container';
 
 interface PlanSemanal {
   id: string;
@@ -44,7 +46,8 @@ export function WeeklyPlanView() {
 
   async function fetchActivePlan() {
     try {
-      const response = await fetch('/api/plan/active');
+      // no-store: nunca servir un plan cacheado por el navegador/SW.
+      const response = await fetch('/api/plan/active', { cache: 'no-store' });
       if (response.ok) {
         const data = await response.json();
         setPlan(data.plan);
@@ -62,6 +65,7 @@ export function WeeklyPlanView() {
       const response = await fetch('/api/plan/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
       });
 
       if (response.ok) {
@@ -90,12 +94,12 @@ export function WeeklyPlanView() {
     return (
       <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
         <Dumbbell size={48} className="mb-4 text-text-muted" />
-        <h2 className="text-xl font-semibold text-text-primary">{t('title')}</h2>
+        <h2 className="t-display text-2xl text-text-primary">{t('title')}</h2>
         <p className="mt-2 max-w-xs text-text-secondary">{t('emptyState')}</p>
         <button
           onClick={handleGeneratePlan}
           disabled={generating}
-          className="mt-6 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-[#0A0E14] transition-colors hover:bg-accent-hover disabled:opacity-50"
+          className="mt-6 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
         >
           {generating ? t('generating') : t('generateButton')}
         </button>
@@ -106,20 +110,20 @@ export function WeeklyPlanView() {
   const dias = plan.plan_json.dias;
 
   return (
-    <div className="px-4 py-4">
+    <PageContainer>
       {/* Header del plan */}
       <div className="mb-4 rounded-xl bg-bg-elevated p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-text-primary">{t('title')}</h2>
-            <p className="mt-1 text-xs text-text-muted">
+            <h2 className="t-display text-xl text-text-primary">{t('title')}</h2>
+            <p className="mt-1 font-mono-metrics text-[10px] uppercase tracking-[0.16em] text-text-muted">
               {t('weekOf')} {formatDate(plan.semana_inicio, locale)}
             </p>
           </div>
           <button
             onClick={handleGeneratePlan}
             disabled={generating}
-            className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-[#0A0E14] transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             {generating ? '...' : t('regenerateButton')}
           </button>
@@ -142,7 +146,7 @@ export function WeeklyPlanView() {
           />
         ))}
       </div>
-    </div>
+    </PageContainer>
   );
 }
 
@@ -155,6 +159,7 @@ function DayCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const t = useTranslations('plan');
   const isRestDay = dia.es_descanso;
 
   return (
@@ -186,14 +191,16 @@ function DayCard({
             )}
           </div>
           <div>
-            <h3 className="font-medium capitalize text-text-primary">{dia.dia}</h3>
-            <p className="text-xs text-text-secondary">{dia.tipo}</p>
+            <h3 className="t-display text-lg capitalize text-text-primary">{dia.dia}</h3>
+            <p className="font-mono-metrics text-[10px] uppercase tracking-[0.12em] text-text-secondary">
+              {dia.tipo}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           {dia.duracion_estimada_min && (
-            <span className="flex items-center gap-1 text-xs text-text-muted">
+            <span className="flex items-center gap-1 font-mono-metrics text-xs text-text-muted">
               <Clock size={12} />
               {dia.duracion_estimada_min}min
             </span>
@@ -224,6 +231,15 @@ function DayCard({
                   index={index}
                 />
               ))}
+
+              {/* CTA para entrar a "En el Ruedo" y ejecutar este día. */}
+              <Link
+                href={`/ruedo/${dia.dia}`}
+                className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover"
+              >
+                <Play size={16} strokeWidth={2} />
+                {t('trainButton')}
+              </Link>
             </div>
           </motion.div>
         )}

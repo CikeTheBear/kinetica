@@ -17,7 +17,9 @@
     "registerButton": "Crear cuenta",
     "noAccount": "¿No tienes cuenta?",
     "hasAccount": "¿Ya tienes cuenta?",
-    "logout": "Cerrar sesión"
+    "logout": "Cerrar sesión",
+    "loginSubtitle": "Entra a tu cuenta para seguir entrenando",
+    "registerSubtitle": "Crea tu cuenta y empieza con Kai"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -26,6 +28,26 @@
     "onboardingTitle": "Empieza con Kai",
     "onboardingBody": "Cuéntale a Kai tu objetivo, tu disponibilidad y tu equipamiento, y generará tu plan de entrenamiento personalizado.",
     "onboardingCta": "Hablar con Kai"
+  },
+  "progress": {
+    "title": "Tu progreso",
+    "emptyTitle": "Aún no hay progreso que mostrar",
+    "emptyBody": "Registra tu primer entrenamiento desde la pestaña Plan y aquí verás tu evolución.",
+    "statWorkouts": "Entrenos",
+    "statVolume": "Volumen",
+    "statStreak": "Racha",
+    "streakUnit": "sem",
+    "volumeTitle": "Volumen por sesión",
+    "volumeSubtitle": "Kg levantados en tus últimas sesiones",
+    "frequencyTitle": "Frecuencia semanal",
+    "frequencySubtitle": "Entrenos por semana",
+    "workoutsUnit": "entrenos",
+    "thisWeek": "Esta semana",
+    "vsPrevWeek": "vs. semana previa",
+    "planWeek": "Plan · esta semana",
+    "restDay": "Descanso",
+    "train": "Entrenar",
+    "today": "Hoy"
   },
   "plan": {
     "title": "Plan semanal",
@@ -37,13 +59,42 @@
     "noPlanDescription": "Kai aún no ha generado tu plan semanal. Empieza conversando con él o genera uno ahora.",
     "generating": "Generando...",
     "weekOf": "Semana del",
-    "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo."
+    "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo.",
+    "trainButton": "Entrenar"
+  },
+  "ruedo": {
+    "backToPlan": "Volver al plan",
+    "seriesDone": "series",
+    "finishWorkout": "Finalizar entrenamiento",
+    "saving": "Guardando...",
+    "saveError": "No se pudo guardar el entrenamiento. Inténtalo de nuevo.",
+    "savedTitle": "¡Entrenamiento guardado!",
+    "savedBody": "Buen trabajo. Tu progreso quedó registrado.",
+    "restLabel": "Descanso",
+    "restDone": "¡Listo!",
+    "restAdd15": "Añadir 15 segundos",
+    "restPause": "Pausar",
+    "restResume": "Reanudar",
+    "restSkip": "Saltar descanso",
+    "suggested": "Sugerido",
+    "colSet": "Serie",
+    "colWeight": "Peso",
+    "colReps": "Reps",
+    "completeSet": "Completar serie"
   },
   "coach": {
     "title": "Coach Kai",
     "placeholder": "Escribe un mensaje...",
     "emptyState": "Aquí hablarás con Kai, tu coach personal.",
     "inputHint": "Enter para enviar · Shift+Enter para nueva línea"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "appearance": "Apariencia",
+    "theme_redline": "Redline",
+    "theme_redline_desc": "Telemetría de alto rendimiento. Sobrio, técnico, preciso.",
+    "theme_kinetic": "Kinetic",
+    "theme_kinetic_desc": "Poster atlético. Vibrante, motivador, con energía."
   },
   "disclaimer": {
     "title": "Aviso médico importante",

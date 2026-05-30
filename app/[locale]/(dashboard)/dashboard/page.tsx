@@ -1,8 +1,7 @@
-import { useTranslations } from 'next-intl';
-import { ArrowRight } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { createClient } from '@/lib/supabase/server';
-import { Link } from '@/navigation';
+import { computeProgress, type WorkoutLogRow } from '@/lib/progress';
+import { DashboardView, type PlanDia } from '@/components/dashboard/dashboard-view';
 
 export default async function DashboardPage({
   params: { locale },
@@ -11,9 +10,8 @@ export default async function DashboardPage({
 }) {
   const user = await requireUser(locale);
 
-  // No redirigimos si el onboarding está incompleto: dejamos que el usuario
-  // llegue al dashboard y le mostramos una invitación amable a hablar con Kai.
-  // (Decisión de UX: preferimos un prompt acogedor a un redirect forzado.)
+  // No redirigimos si el onboarding está incompleto: el DashboardView muestra
+  // una invitación amable a hablar con Kai (decisión de UX consensuada).
   const supabase = createClient();
   const { data: profile } = await supabase
     .from('user_profiles')
@@ -21,35 +19,37 @@ export default async function DashboardPage({
     .eq('id', user.id)
     .single();
 
-  return <DashboardPageContent onboardingCompleted={profile?.onboarding_completed === true} />;
-}
+  // Datos de progreso a partir de los entrenamientos registrados ("En el Ruedo").
+  const { data: logs } = await supabase
+    .from('workout_logs')
+    .select('fecha, ejercicio_nombre, sets')
+    .eq('user_id', user.id);
 
-function DashboardPageContent({ onboardingCompleted }: { onboardingCompleted: boolean }) {
-  const t = useTranslations('dashboard');
+  // Plan activo: para la tira de "hoy / próximos días" del Dashboard.
+  const { data: plan } = await supabase
+    .from('weekly_plans')
+    .select('plan_json')
+    .eq('user_id', user.id)
+    .eq('estado', 'active')
+    .order('semana_inicio', { ascending: false })
+    .limit(1)
+    .single();
+
+  const rows = (logs ?? []) as WorkoutLogRow[];
+  const planDias: PlanDia[] = (plan?.plan_json?.dias ?? []).map(
+    (d: { dia: string; tipo: string; es_descanso: boolean }) => ({
+      dia: d.dia,
+      tipo: d.tipo,
+      es_descanso: d.es_descanso,
+    })
+  );
 
   return (
-    <div className="flex flex-col px-4 py-8">
-      <h1 className="text-2xl font-semibold text-text-primary">{t('title')}</h1>
-
-      {!onboardingCompleted && (
-        <Link
-          href="/coach?onboarding=true"
-          className="mt-6 flex items-center gap-4 rounded-2xl border border-accent/30 bg-accent-muted p-5 transition-colors hover:bg-accent/10"
-        >
-          <div className="flex-1">
-            <p className="font-semibold text-text-primary">{t('onboardingTitle')}</p>
-            <p className="mt-1 text-sm text-text-secondary">{t('onboardingBody')}</p>
-            <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-on-accent">
-              {t('onboardingCta')}
-              <ArrowRight size={16} strokeWidth={2} />
-            </span>
-          </div>
-        </Link>
-      )}
-
-      {onboardingCompleted && (
-        <p className="mt-4 text-text-secondary">{t('emptyState')}</p>
-      )}
-    </div>
+    <DashboardView
+      onboardingCompleted={profile?.onboarding_completed === true}
+      hasLogs={rows.length > 0}
+      progress={computeProgress(rows)}
+      planDias={planDias}
+    />
   );
 }

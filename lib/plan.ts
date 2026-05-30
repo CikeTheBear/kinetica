@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { getUserContext } from '@/lib/memory';
+import { getCatalogForUser } from '@/lib/wger';
 import { z } from 'zod';
 
 /**
@@ -91,7 +92,8 @@ async function generateAndValidatePlan(
   apiKey: string,
   model: string,
   systemPrompt: string,
-  nextMonday: string
+  nextMonday: string,
+  validWgerIds: Set<number>
 ): Promise<PlanSemanal | null> {
   const MAX_ATTEMPTS = 3;
 
@@ -130,6 +132,17 @@ async function generateAndValidatePlan(
 }
 Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de wger.de.`;
 
+  // Semilla de variación: se genera una por cada llamada (cada "Regenerar").
+  // Cumple dos funciones:
+  //  1. Hace que el cuerpo de la petición sea ÚNICO entre regeneraciones. Sin
+  //     esto, dos clicks consecutivos mandaban una petición byte-idéntica y
+  //     OpenRouter/Bedrock devolvía la MISMA completion (el plan no cambiaba: el
+  //     bug que estamos cerrando). El nonce en el prompt + el seed rompen eso.
+  //  2. Le indica al modelo de forma explícita que debe producir una rutina nueva.
+  const variationSeed = Math.floor(Math.random() * 1_000_000_000);
+  const variationInstruction = `\n\nVARIACIÓN (id ${variationSeed}): genera un plan NUEVO y DISTINTO a cualquier plan anterior. Varía la selección de ejercicios del catálogo, su orden y los esquemas de sets/reps. No repitas la misma combinación de ejercicios de otras semanas.`;
+  const userContent = formatInstructions + variationInstruction;
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -144,9 +157,12 @@ Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de w
           model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: formatInstructions },
+            { role: 'user', content: userContent },
           ],
-          temperature: 0.5,
+          // 0.8: suficiente variedad entre regeneraciones sin que el plan se
+          // vuelva incoherente. seed: varía la petición a nivel de proveedor.
+          temperature: 0.8,
+          seed: variationSeed,
           max_tokens: 4000,
         }),
       });
@@ -164,12 +180,25 @@ Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de w
         if (parsedPlan !== undefined) {
           const validationResult = PlanSemanalSchema.safeParse(parsedPlan);
           if (validationResult.success) {
-            return validationResult.data;
+            // Validación dura: todos los wger_id deben existir en el catálogo
+            // que le pasamos. Cierra el agujero de que el LLM invente ejercicios.
+            const inventados = validationResult.data.dias
+              .flatMap((d) => d.ejercicios)
+              .map((e) => e.wger_id)
+              .filter((id) => !validWgerIds.has(id));
+
+            if (inventados.length === 0) {
+              return validationResult.data;
+            }
+            console.error(
+              `[plan] El plan usa wger_id fuera del catálogo (intento ${attempt}/${MAX_ATTEMPTS}): ${inventados.join(', ')}`
+            );
+          } else {
+            console.error(
+              `[plan] Plan inválido contra el schema Zod (intento ${attempt}/${MAX_ATTEMPTS})`,
+              validationResult.error.errors
+            );
           }
-          console.error(
-            `[plan] Plan inválido contra el schema Zod (intento ${attempt}/${MAX_ATTEMPTS})`,
-            validationResult.error.errors
-          );
         } else {
           console.error(
             `[plan] No se pudo extraer JSON de la respuesta (intento ${attempt}/${MAX_ATTEMPTS})`
@@ -257,26 +286,38 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
   // 2. Calcular lunes de la semana que viene
   const nextMonday = getNextMonday();
 
-  // 3. Verificar que no haya ya un plan para esa semana
-  const { data: existingPlan } = await supabase
-    .from('weekly_plans')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('semana_inicio', nextMonday)
-    .maybeSingle();
-
-  if (existingPlan) {
-    return {
-      ok: false,
-      status: 409,
-      error: 'Ya existe un plan para la semana del ' + nextMonday,
-    };
-  }
+  // (Regenerar es válido: si ya hay un plan para esta semana lo reemplazamos.
+  // El borrado se hace MÁS ABAJO, solo cuando ya tenemos un plan nuevo válido,
+  // para no dejar al usuario sin plan si la generación falla.)
 
   // 4. Construir contexto para el LLM. getUserContext devuelve un objeto;
   // aquí solo necesitamos el bloque de texto del contexto.
   const { context } = await getUserContext(userId);
   const locale = profile.locale || 'es';
+
+  // 4b. Cargar el catálogo de ejercicios accesible según el equipamiento del
+  // usuario. El LLM elegirá SOLO de esta lista (con wger_id reales), de modo que
+  // no pueda inventar ejercicios inexistentes. Esto requiere que exercises_cache
+  // esté poblado (POST /api/admin/sync-exercises).
+  const metadata = (profile.metadata_biometrica || {}) as Record<string, unknown>;
+  const equipamiento = Array.isArray(metadata.equipamiento)
+    ? (metadata.equipamiento as string[])
+    : [];
+  const catalogo = await getCatalogForUser(equipamiento);
+
+  if (catalogo.length === 0) {
+    return {
+      ok: false,
+      status: 503,
+      error:
+        'No hay ejercicios disponibles en el catálogo. ¿Se sincronizó exercises_cache con wger.de?',
+    };
+  }
+
+  const validWgerIds = new Set(catalogo.map((c) => c.wger_id));
+  const catalogoText = catalogo
+    .map((c) => `${c.wger_id} | ${c.nombre}${c.grupo_muscular ? ` | ${c.grupo_muscular}` : ''}`)
+    .join('\n');
 
   // 5. Config OpenRouter
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -289,7 +330,7 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
   const systemPrompt = `Eres Kai, coach personal de Kinética. Genera un plan semanal de entrenamiento estructurado y preciso.
 
 REGLAS CRÍTICAS:
-1. Usa SOLO ejercicios que existan en wger.de (IDs reales).
+1. Usa ÚNICAMENTE ejercicios del CATÁLOGO de abajo. Cada "wger_id" del plan DEBE ser uno de los IDs listados. NO inventes ejercicios ni IDs que no estén en el catálogo.
 2. El plan debe cubrir exactamente 7 días (lunes a domingo).
 3. Respeta lesiones activas: si el usuario reportó una lesión, NO incluyas ejercicios que la agraven.
 4. Adapta volumen e intensidad al nivel de experiencia del usuario.
@@ -298,10 +339,14 @@ REGLAS CRÍTICAS:
 
 ${context}
 
+=== CATÁLOGO DE EJERCICIOS DISPONIBLES (formato: wger_id | nombre | grupo muscular) ===
+${catalogoText}
+=== FIN DEL CATÁLOGO ===
+
 Idioma del usuario: ${locale}. Genera todo el plan en ese idioma.`;
 
-  // 6. Generar con reintentos + validación
-  const validPlan = await generateAndValidatePlan(apiKey, model, systemPrompt, nextMonday);
+  // 6. Generar con reintentos + validación (Zod + wger_id dentro del catálogo)
+  const validPlan = await generateAndValidatePlan(apiKey, model, systemPrompt, nextMonday, validWgerIds);
 
   if (!validPlan) {
     return {
@@ -312,7 +357,15 @@ Idioma del usuario: ${locale}. Genera todo el plan en ese idioma.`;
     };
   }
 
-  // 7. Guardar en BD
+  // 7. Guardar en BD. Si ya existía un plan para esta semana, lo borramos ahora
+  // (ya tenemos uno nuevo válido) para liberar el UNIQUE(user_id, semana_inicio)
+  // y permitir la regeneración sin dejar al usuario sin plan ante un fallo.
+  await supabase
+    .from('weekly_plans')
+    .delete()
+    .eq('user_id', userId)
+    .eq('semana_inicio', nextMonday);
+
   const { data: insertedPlan, error: insertError } = await supabase
     .from('weekly_plans')
     .insert({

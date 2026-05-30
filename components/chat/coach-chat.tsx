@@ -60,7 +60,9 @@ export function CoachChat() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col">
+    // Centrado y con ancho máximo en desktop; altura: viewport menos el header
+    // en móvil, viewport completo en desktop (allí no hay header superior).
+    <div className="mx-auto flex h-[calc(100dvh-3.5rem)] w-full max-w-2xl flex-col md:h-dvh">
       {/* Area de mensajes */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
@@ -92,9 +94,9 @@ export function CoachChat() {
       {/* Input */}
       <form
         onSubmit={handleSubmit}
-        className="border-t border-border-subtle bg-bg-elevated/90 px-4 py-3 backdrop-blur-md"
+        className="border-t border-border-subtle bg-bg-elevated/90 px-4 pb-20 pt-3 backdrop-blur-md md:pb-3"
       >
-        <div className="mx-auto flex max-w-md items-end gap-2 rounded-2xl border border-border-default bg-bg-overlay px-4 py-2">
+        <div className="flex w-full items-center gap-2 rounded-2xl border border-border-default bg-bg-overlay px-3 py-1.5">
           <textarea
             ref={textareaRef}
             value={inputValue}
@@ -104,12 +106,12 @@ export function CoachChat() {
             placeholder={t('placeholder')}
             disabled={isLoading}
             rows={1}
-            className="flex-1 max-h-[120px] resize-none bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+            className="flex-1 max-h-[120px] resize-none self-center bg-transparent py-1.5 text-sm leading-5 text-text-primary placeholder:text-text-muted focus:outline-none"
           />
           <button
             type="submit"
             disabled={isLoading || !inputValue.trim()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-[#0A0E14] transition-opacity disabled:opacity-50"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent transition-opacity disabled:opacity-50"
           >
             {isLoading ? (
               <Loader2 size={16} className="animate-spin" />
@@ -118,7 +120,7 @@ export function CoachChat() {
             )}
           </button>
         </div>
-        <p className="mx-auto mt-1 max-w-md text-center text-[10px] text-text-muted">
+        <p className="mt-1 text-center text-[10px] text-text-muted">
           {t('inputHint')}
         </p>
       </form>

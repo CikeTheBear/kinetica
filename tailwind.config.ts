@@ -10,31 +10,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Base backgrounds
-        'bg-base': '#0A0E14',
-        'bg-elevated': '#141A22',
-        'bg-overlay': '#1E2733',
-        // Borders
-        'border-subtle': '#1E2733',
-        'border-default': '#2A3441',
-        // Text
-        'text-primary': '#E8EEF2',
-        'text-secondary': '#8B98A8',
-        'text-muted': '#5A6573',
-        // Accent — amarillo nitro
-        accent: '#E5FF00',
-        'accent-hover': '#C8E000',
-        'accent-pressed': '#A8BF00',
-        'accent-muted': 'rgba(229, 255, 0, 0.08)',
-        'accent-glow': 'rgba(229, 255, 0, 0.25)',
-        // Text over accent — CRITICAL: always dark
-        'on-accent': '#0A0E14',
+        // Tokens semánticos → CSS variables. El valor real lo define cada tema
+        // (`[data-theme="redline"]` / `[data-theme="kinetic"]`) en globals.css.
+        // Cambiar de tema = cambiar el atributo data-theme en <html>.
+        'bg-base': 'var(--bg-base)',
+        'bg-elevated': 'var(--bg-elevated)',
+        'bg-overlay': 'var(--bg-overlay)',
+        'border-subtle': 'var(--border-subtle)',
+        'border-default': 'var(--border-default)',
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'text-muted': 'var(--text-muted)',
+        // Accent — amarillo nitro (constante en ambos temas, pero vía var por consistencia)
+        accent: 'var(--accent)',
+        'accent-hover': 'var(--accent-hover)',
+        'accent-pressed': 'var(--accent-pressed)',
+        'accent-muted': 'var(--accent-muted)',
+        'accent-glow': 'var(--accent-glow)',
+        // Acento secundario: redline → rojo redline · kinetic → magenta eléctrico
+        'accent-2': 'var(--accent-2)',
+        // Texto sobre accent — SIEMPRE oscuro (ambos temas son dark)
+        'on-accent': 'var(--on-accent)',
         // Status
         'status-success': '#4ADE80',
         'status-warning': '#FFB547',
         'status-danger': '#FF5757',
         'status-info': '#5AB8FF',
-        // Metrics
+        // Metrics (independientes del tema; usadas en gráficas)
         'metric-weight': '#5AB8FF',
         'metric-muscle': '#E5FF00',
         'metric-fat': '#FFB547',
@@ -43,8 +45,11 @@ const config: Config = {
         'metric-cardio': '#FF7AB6',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        // Roles tipográficos → variables que cada tema mapea a su fuente.
+        sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        body: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
     },
   },

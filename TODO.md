@@ -1,205 +1,153 @@
-# TODO — Kinética (Estado REAL al 26 May 2026)
+# TODO — Kinética (Estado REAL al 29 May 2026)
 
-> Este documento contiene el estado REAL del proyecto. Fue actualizado después de múltiples intentos de arreglar el chat de Kai.
-> ✅ = Funciona | 🐛 = Roto / Bug conocido | ⏳ = No implementado | ⚠️ = Temporalmente desactivado
+> Estado real del proyecto al cierre de la sesión con Vertex (Claude). Léelo entero antes de tocar nada — explica qué funciona, qué está roto y por dónde seguir.
+> ✅ Funciona · 🐛 Roto · ⏳ No implementado · ⚠️ Parcial / temporalmente desactivado
 
 ---
 
 ## URL de Producción
 **https://kinetica-delta.vercel.app**
 
-Último deploy: 26 May 2026
+## Estado de Git (al cierre)
+
+- Ramas: `main` (principal/versiones), `develop` (desarrollo), features salen de `develop`.
+- **`develop` está al día y pusheado a origin.** Integra todo lo de esta sesión: fix de regeneración de plan + integración wger, ESLint, "En el Ruedo", gráficas de progreso y las tools de Kai. No hay ramas de feature abiertas (se mergearon y borraron).
+- **`main` sigue en una versión anterior** — pendiente un release `develop` → `main` cuando se decida.
+- Modelo LLM en uso: `anthropic/claude-haiku-4.5` (env var `OPENROUTER_DEFAULT_MODEL`).
 
 ---
 
 ## ✅ Lo que FUNCIONA
 
 ### Autenticación
-- [x] Registro con email/password (Supabase Auth)
-- [x] Login con email/password
-- [x] Logout
-- [x] Email confirmation **desactivado** (para testing v1)
-- [x] Funciona en local y producción
+- [x] Registro / login / logout con Supabase Auth (email confirmation desactivado v1).
+- [x] Redirects con locale activo (es/en), destino post-login unificado a `/dashboard`.
+- [x] Guard de sesión en `/disclaimer`.
+- [x] Perfil creado por trigger SQL `handle_new_user`, sin insert manual duplicado.
 
-### Navegación y UI Base
-- [x] Bottom nav con 3 tabs: Dashboard, Plan, Coach
-- [x] Dark mode first implementado (Tailwind config completo)
-- [x] i18n básico (es/en) con next-intl
-- [x] Layout del dashboard con tabs funcionando
+### UI base
+- [x] Bottom nav (Dashboard, Plan, Coach), dark mode first.
+- [x] i18n (es/en) con next-intl — todos los textos relevantes extraídos a `messages/`.
+- [x] Banner de invitación al onboarding en el Dashboard si onboarding incompleto (no fuerza redirect a Coach).
+- [x] Fuentes vía `next/font` (sin doble carga), zoom permitido (a11y).
+- [x] PWA instalable con icono SVG placeholder (Carlos: pendiente PNGs definitivos 192/512).
 
-### Chat con Kai — FUNCIONA PARCIALMENTE (ver bugs abajo)
-- [x] SSE streaming implementado (backend + frontend)
-- [x] Markdown renderer (negritas, listas, tablas)
-- [x] Multiline textarea con Enter-to-send
-- [x] Memoria Capa 1 (contexto del usuario desde BD)
-- [x] Memoria Capa 2 (últimos 20 mensajes de chat)
-- [x] Memoria Capa 3 (resúmenes de conversaciones previas)
-- [x] Tool `update_user_profile` — actualiza `metadata_biometrica`
-- [x] Tool `mark_onboarding_complete` — marca onboarding como completado
-- [x] Tool `generate_weekly_plan` — genera plan vía endpoint
-- [x] **Onboarding conversacional** — Kai pide datos y los guarda
-- [x] Tool calling con segunda llamada al LLM (refactor reciente)
+### Chat con Kai
+- [x] SSE streaming sin cuelgues (buffer correcto en backend).
+- [x] Markdown renderer + bloques especiales `kinetica:*`.
+- [x] Memoria 3 capas (contexto del usuario + últimos 20 mensajes + resúmenes).
+- [x] Tool `update_user_profile` (escribe `metadata_biometrica` con campos canónicos).
+- [x] Tool `generate_weekly_plan` (llama in-process a `generatePlanForUser`).
+- [x] **Onboarding conversacional SIN bucle** — el backend detecta los 5 datos canónicos vía `isOnboardingDataComplete` y marca `onboarding_completed` solo, sin depender del LLM.
+- [x] System prompt condicional (modo onboarding vs modo coach).
 
-### Plan Semanal
-- [x] Endpoint `/api/plan/generate` con OpenRouter structured outputs
-- [x] Validación Zod del plan generado
-- [x] Renderizado básico del plan en UI (vista semanal)
+### Plan semanal
+- [x] Generación vía prompt + Zod (sin `response_format/json_schema`, que rompía con Bedrock).
+- [x] Reintentos con backoff (3 intentos). Tolera días de descanso (duración 0).
+- [x] `getNextMonday` con timezone correcta.
+- [x] **Integración real con wger.de**:
+  - `lib/wger.ts`: cliente del catálogo (`/exerciseinfo/`, traducciones es/en, equipamiento, imagen).
+  - `lib/supabase/admin.ts`: cliente service_role para poder escribir en `exercises_cache` (su RLS bloquea el cliente normal).
+  - `exercises_cache` poblado con 846 ejercicios reales (sync ejecutado al menos una vez en esta sesión).
+  - Endpoint `POST /api/admin/sync-exercises` protegido con `SYNC_SECRET` para refrescar el catálogo a demanda.
+  - `getCatalogForUser` filtra el catálogo por el equipamiento del usuario (mapeo Kinética ↔ wger).
+  - El LLM elige SOLO de los `wger_id` del catálogo que se le pasa; validación dura post-Zod (si inventa un ID, reintenta).
+- [x] Regenerar plan reemplaza el de la semana (borra el anterior solo si el nuevo es válido; antes devolvía 409).
+
+### En el Ruedo (modo de ejecución del entrenamiento)
+- [x] Ruta `/[locale]/ruedo/[dia]` (server component: auth, carga plan activo, valida día, redirige a `/plan` si no aplica).
+- [x] Series pre-rellenadas desde los objetivos del plan (peso sugerido + reps objetivo parseadas).
+- [x] Steppers grandes +/- de peso (paso 2.5 kg) y reps; marcar serie completada.
+- [x] Timer de descanso flotante al completar serie (pausar, +15s, saltar, vibración al terminar).
+- [x] Autosave en `localStorage` (borrador por plan+día, con firma de ejercicios para invalidar si se regenera el plan).
+- [x] `POST /api/workout/log` con validación Zod, idempotente por día → escribe en `workout_logs` (una fila por ejercicio, series en `jsonb`).
+- [x] Botón "Entrenar" por día de entreno en la pestaña Plan. i18n es/en.
+
+### Gráficas de progreso (Dashboard)
+- [x] `lib/progress.ts`: agregación pura de `workout_logs` (volumen = ∑ peso×reps de series completadas, entrenos, racha de semanas, frecuencia semanal). Con tests (`tests/progress.test.ts`).
+- [x] Dashboard consulta `workout_logs`, agrega y muestra tarjetas de resumen (entrenos / volumen / racha) + gráficas; empty state si aún no hay entrenos.
+- [x] `components/dashboard/progress-charts.tsx`: gráficas con **Recharts** (volumen por sesión, frecuencia semanal) tematizadas con el design system. i18n es/en.
+
+### Tools de Kai (coach que actúa)
+- [x] `query_progress_summary`: Kai resume entrenos/volumen/racha/frecuencia con datos reales (reusa `computeProgress` + `formatProgressSummary`).
+- [x] `register_injury` / `resolve_injury`: escriben `metadata_biometrica.lesiones_activas` (match flexible string/objeto para convivir con datos del onboarding). Verificado en BD.
+- [x] System prompt del modo coach ampliado para indicar cuándo llamarlas. Schemas Bedrock-safe.
 
 ### Backend / Infra
-- [x] Supabase conectado (proyecto: `focbdmounzgaujtirvno`)
-- [x] Schema inicial creado (`user_profiles`, `chat_messages`, `biometrics_history`, `weekly_plans`, etc.)
-- [x] RLS habilitado en tablas
-- [x] Vercel deploy automatizado desde GitHub
+- [x] Supabase (`focbdmounzgaujtirvno`) con RLS en todas las tablas.
+- [x] Tests vitest: 20 casos en verde (`isOnboardingDataComplete` + agregación de progreso en `lib/progress.ts`).
+- [x] ESLint configurado (`next/core-web-vitals`); `npm run lint` pasa limpio.
+- [x] Typecheck limpio.
 
 ---
 
-## 🐛 BUGS CONOCIDOS (prioridad alta)
+## ✅ CERRADO — "Regenerar no cambiaba el plan"
 
-### 1. Chat de Kai entra en bucle de onboarding [CRÍTICO]
-**Síntoma:** Cuando el usuario confirma sus datos, Kai repite las preguntas de onboarding en vez de marcarlo como completado y generar el plan.
+**Síntoma original:** al pulsar "Regenerar" en la pestaña Plan, el plan mostrado no cambiaba en nada (ni siquiera los ejercicios al expandir una card).
 
-**Causa raíz:** A pesar de tener:
-- Tool `mark_onboarding_complete` implementada
-- Reglas en system prompt que le dicen a Kai qué hacer
-- Tool calling con segunda llamada al LLM
+**Causa raíz (verificada, NO era lo que decía el handoff anterior):** la petición al LLM era **byte-idéntica** entre regeneraciones consecutivas — `temperature: 0.5`, sin nonce de variación ni `seed` (el código real NO tenía la "semilla de variación" que los docs afirmaban). El proveedor (Claude vía Bedrock/OpenRouter) devolvía la **misma completion** ante una petición idéntica → el mismo `plan_json`. No era ni la UI, ni el render de React, ni un Service Worker.
 
-...el modelo (google/gemini-3-flash-preview) **no respeta consistentemente** las instrucciones del system prompt para llamar tools. A veces llama la tool, a veces no, a veces simula que la llamó sin hacerlo.
+**Cómo se diagnosticó:** se instrumentó el **cliente** (paso que el handoff anterior nunca ejecutó) logueando la huella de `wger_id` recibida. Dos regeneraciones daban la huella idéntica `[539,1219,1467,1296,1919]` pese a `cache: 'no-store'` → descartaba caché de navegador/SW y señalaba al backend.
 
-**Historial de intentos:**
-- Intento 1: Añadir reglas en system prompt → No funcionó
-- Intento 2: Crear tool `mark_onboarding_complete` → Tool creada pero modelo no la llama
-- Intento 3: Refactor tool calling con segunda llamada al LLM → Parcial, sigue sin ser confiable
+**Fix (`lib/plan.ts`, `generateAndValidatePlan`):**
+- Nonce de variación inyectado en el prompt del usuario + pasado como `seed` → cada regeneración manda una petición ÚNICA.
+- `temperature` subida de 0.5 a 0.8.
+- Instrucción explícita de "genera un plan distinto al anterior".
 
-**Posibles soluciones:**
-1. **Cambiar a modelo más obediente** (Claude 3.5 Sonnet, GPT-4o) que respete tool calling
-2. **No depender del LLM para lógica de estado** — Hacer el onboarding en pasos estructurados (formulario wizard) y que Kai solo confirme
-3. **Hardcodear el flujo** — Detectar en el backend cuándo tenemos los 5 datos y forzar `mark_onboarding_complete` sin depender del LLM
+Tras el fix, las huellas cambian en cada regeneración (ej. `[1094,1084,1228,1779,1194,1919]` vs `[1119,1082,1471,1307,1572,1921]`) y la UI refresca correctamente.
 
-### 2. Chat se queda en "escribiendo" sin responder [CRÍTICO]
-**Síntoma:** Después de unos mensajes, Kai deja de responder. El indicador de "escribiendo" aparece pero no llega contenido.
-
-**Causa raíz:** SSE streaming puede romperse cuando:
-- OpenRouter envía chunks fragmentados que no se parsean bien
-- La tool calling interrumpe el stream y no se recupera
-- El `abortController` no se limpia correctamente entre mensajes
-
-**Intentos:**
-- Añadido buffer de líneas en el frontend
-- Añadido manejo de errores en el stream
-- Refactor de tool calling con segunda llamada
-
-**Estado:** Parcialmente arreglado pero no 100% confiable.
-
-### 3. Service Worker antiguo causa problemas de caché
-**Síntoma:** Deploys nuevos no se reflejan inmediatamente en el navegador.
-
-**Workaround actual:** Kill-switch SW en `public/sw.js` que desregistra SWs antiguos.
-
-**Solución definitiva:** Implementar Service Worker correcto con estrategia de caché apropiada.
+**Mejora defensiva añadida de paso:** `cache: 'no-store'` en los `fetch` del cliente y header `Cache-Control: no-store` en `/api/plan/generate` y `/api/plan/active`.
 
 ---
 
-## ⚠️ Temporalmente Desactivado
+## ⚠️ Parcial / desactivado
 
-- **Disclaimer médico** — Implementado en `/disclaimer` pero desactivado en layout para evitar loops de redirect
-- **Service Worker** — Solo kill-switch, no hay funcionalidad PWA real (offline, push)
-- **Onboarding redirect** — Checks de `onboarding_completed` y `disclaimer_accepted_at` removidos del dashboard layout para evitar loops
-
----
-
-## ⏳ NO IMPLEMENTADO (pendiente de sprints futuros)
-
-### Core features
-- [ ] Registro de entrenamientos ("En el Ruedo")
-- [ ] Timer de descanso entre series
-- [ ] Importación de datos de salud (Apple Health XML, CSV, PDF báscula)
-- [ ] Gráficas de progreso en Dashboard
-- [ ] Videos de ejercicios (YouTube Data API v3)
-- [ ] Notificaciones push (Web Push)
-- [ ] Cron jobs para mensajes proactivos de Kai
-
-### APIs externas
-- [ ] YouTube Data API v3 key
-- [ ] wger.de integración real (solo está el cliente, no se consume en el plan)
-
-### Tools de Kai (faltan)
-- [ ] `register_injury`
-- [ ] `resolve_injury`
-- [ ] `modify_current_plan`
-- [ ] `log_biometric_entry`
-- [ ] `log_health_metric`
-- [ ] `query_progress_summary`
-
-### Observabilidad
-- [ ] Sentry
-- [ ] PostHog
-
-### Assets
-- [ ] Iconos PWA (192x192, 512x512)
-- [ ] Splash screens iOS
-
-### Testing
-- [ ] Ningún test escrito todavía
+- **Service Worker**: solo kill-switch en `public/sw.js`; no hay PWA real (offline, push). Probable culpable del bug activo si hay SWs antiguos residuales.
+- **Disclaimer**: tiene guard de auth pero falta re-engancharlo en el flujo (idealmente modal, no redirect).
+- **Iconos PWA**: SVG placeholder funcional; pendiente diseño PNG definitivo de Carlos (192×192 y 512×512, opcional maskable).
+- **`scripts/setup-auth-trigger.ts`**: documentado como roto (usa service_role key como password de Postgres, que no lo es).
 
 ---
 
-## Variables de Entorno Actuales (Vercel)
+## ⏳ NO IMPLEMENTADO (próximos sprints)
 
-Las siguientes están configuradas en Vercel:
-- `NEXT_PUBLIC_APP_URL=https://kinetica-delta.vercel.app`
-- `NEXT_PUBLIC_SUPABASE_URL=https://focbdmounzgaujtirvno.supabase.co`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY=<public>`
-- `OPENROUTER_API_KEY=<set>`
-- `OPENROUTER_DEFAULT_MODEL=google/gemini-3-flash-preview` ⚠️ **Modelo actual, ver nota abajo**
-- `SUPABASE_SERVICE_ROLE_KEY=<set>`
+**Candidatas a siguiente feature** (sin orden fijo): `modify_current_plan` (la tool que dejamos fuera: mutar el `plan_json` ejercicio a ejercicio + revalidar contra el catálogo wger — la más delicada), videos de ejercicios, o importación de datos de salud.
 
-**Nota sobre el modelo:** Actualmente usa `google/gemini-3-flash-preview` que es económico pero **no respeta bien tool calling ni system prompts complejos**. Se recomienda cambiar a `anthropic/claude-3.5-sonnet` o `openai/gpt-4o` para mejor confiabilidad.
-
----
-
-## Stack Tecnológico Actual
-
-| Capa | Tecnología | Estado |
-|---|---|---|
-| Framework | Next.js 14.2.3 + App Router | ✅ |
-| Lenguaje | TypeScript | ✅ |
-| Estilos | Tailwind CSS + shadcn/ui | ✅ |
-| Backend / DB / Auth | Supabase | ✅ |
-| LLM | OpenRouter | ✅ (pero modelo problemático) |
-| Hosting | Vercel | ✅ |
-| i18n | next-intl | ✅ |
-| Iconos | lucide-react | ✅ |
+### Resto del backlog
+- [ ] Tool `modify_current_plan` de Kai (modificar el plan activo sin regenerarlo entero; revalidar `wger_id` contra el catálogo).
+- [ ] Otras tools de Kai: `log_biometric_entry`, `log_health_metric`.
+- [ ] Mejoras a "En el Ruedo" v2: guardado incremental por serie (no solo al finalizar), modo immersive sin bottom nav, notas por ejercicio, historial de entrenos pasados.
+- [ ] Importación de datos de salud (Apple Health XML, CSV báscula, PDF) → llena `biometrics_history` y desbloquea gráficas de peso/composición.
+- [ ] Videos de ejercicios (YouTube Data API v3) — ahora factible con `wger_id` reales.
+- [ ] Notificaciones push (Web Push) + cron de mensajes proactivos de Kai.
+- [ ] Observabilidad: Sentry, PostHog.
+- [ ] Cron en Vercel para resincronizar `exercises_cache` periódicamente.
+- [ ] Ampliar tests (parser de salud, validadores, tools que mutan datos, 1 happy path E2E).
+- [ ] Tablas de schema sin uso aún: `proactive_jobs_log`, `push_subscriptions`.
 
 ---
 
-## Decisiones Técnicas Tomadas
+## Variables de entorno relevantes
 
-1. **Modelo LLM actual:** `google/gemini-3-flash-preview` — económico pero problemático con tool calling. Considerar cambio.
-2. **Tool calling:** Implementado con doble llamada (primera para tools, segunda para respuesta). Funciona pero es frágil con el modelo actual.
-3. **Service Worker:** Kill-switch temporal. No hay offline support todavía.
-4. **Onboarding:** Flujo conversacional puramente por chat. Esto ha demostrado ser poco confiable. Considerar wizard estructurado.
-5. **Redirects:** Eliminados checks de onboarding/disclaimer del layout para evitar loops. Se necesita re-implementar de forma segura.
+Local (`.env.local`) y/o Vercel:
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- `OPENROUTER_API_KEY` (server-only)
+- `OPENROUTER_DEFAULT_MODEL=anthropic/claude-haiku-4.5`
+- `SYNC_SECRET` (server-only, para `/api/admin/sync-exercises`)
 
 ---
 
-## Próximos Pasos Recomendados
+## Decisiones técnicas clave de esta sesión
 
-**Opción A — Arreglar chat primero:**
-1. Cambiar modelo a Claude 3.5 Sonnet o GPT-4o
-2. Simplificar el system prompt de Kai (menos reglas, más directo)
-3. Implementar hardcoded onboarding detection en backend
-4. Re-habilitar disclaimer con modal en vez de redirect
-
-**Opción B — Pivotar a wizard estructurado:**
-1. Crear wizard de onboarding con pasos estructurados (formularios)
-2. Kai solo confirma datos al final, no guía el flujo
-3. Más predecible, menos dependencia del LLM
-
-**Opción C — Mixto:**
-1. Wizard estructurado para recopilar datos
-2. Kai como "coach" que comenta y ajusta, no como guía del flujo
+1. **No usar `response_format: json_schema`** del proveedor en la generación de plan. Bedrock (que sirve Claude vía OpenRouter) rechaza constraints como `minItems`/`minimum`/`maximum`. Se pide el JSON por prompt y se valida con Zod. Esto desacopla del proveedor.
+2. **Onboarding determinístico en backend, no en el LLM.** `isOnboardingDataComplete` decide cuándo está completo, y `updateUserProfile` marca el flag automáticamente. El system prompt es condicional (modo onboarding vs coach).
+3. **Catálogo de ejercicios pre-sincronizado, no enriquecimiento post-generación.** El LLM elige `wger_id` de la lista real de wger filtrada por el equipamiento del usuario → imposible inventar ejercicios.
+4. **Cliente admin Supabase con service_role** para escribir en `exercises_cache` (su RLS bloquea el cliente de sesión).
+5. **Regenerar reemplaza el plan de la semana**, generando el nuevo PRIMERO y borrando el viejo solo si el nuevo es válido (no dejar al usuario sin plan ante un fallo).
 
 ---
 
 ## Contacto
-Carlos. Cualquier duda, ambigüedad o decisión de arquitectura → consultar con él.
+Carlos. Cualquier ambigüedad de arquitectura o flujo → consultar con él.
