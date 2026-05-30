@@ -27,6 +27,20 @@
     "onboardingBody": "Cuéntale a Kai tu objetivo, tu disponibilidad y tu equipamiento, y generará tu plan de entrenamiento personalizado.",
     "onboardingCta": "Hablar con Kai"
   },
+  "progress": {
+    "title": "Tu progreso",
+    "emptyTitle": "Aún no hay progreso que mostrar",
+    "emptyBody": "Registra tu primer entrenamiento desde la pestaña Plan y aquí verás tu evolución.",
+    "statWorkouts": "Entrenos",
+    "statVolume": "Volumen",
+    "statStreak": "Racha",
+    "streakUnit": "sem",
+    "volumeTitle": "Volumen por sesión",
+    "volumeSubtitle": "Kg levantados en tus últimas sesiones",
+    "frequencyTitle": "Frecuencia semanal",
+    "frequencySubtitle": "Entrenos por semana",
+    "workoutsUnit": "entrenos"
+  },
   "plan": {
     "title": "Plan semanal",
     "emptyState": "No tienes un plan activo. Pídele a Kai que te genere uno.",
