@@ -40,7 +40,7 @@ export function ExerciseTracker({
     <div className="rounded-xl border border-border-default bg-bg-elevated p-4">
       {/* Cabecera: nombre + objetivos del plan */}
       <div className="mb-3">
-        <h3 className="font-medium text-text-primary">{ejercicio.nombre}</h3>
+        <h3 className="t-display text-lg text-text-primary">{ejercicio.nombre}</h3>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-secondary">
           <span className="font-mono-metrics">
             {ejercicio.series.length}×{target.reps_objetivo}

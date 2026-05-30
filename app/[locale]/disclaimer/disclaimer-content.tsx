@@ -32,7 +32,7 @@ export function DisclaimerContent() {
       <div className="flex items-center justify-center border-b border-border-subtle px-4 py-5">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-status-warning" />
-          <h1 className="text-lg font-semibold text-text-primary">
+          <h1 className="t-display text-lg text-text-primary">
             {t('title')}
           </h1>
         </div>
@@ -43,7 +43,7 @@ export function DisclaimerContent() {
         <div className="mx-auto max-w-md space-y-6">
           {/* Spanish */}
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
+            <h2 className="font-mono-metrics text-xs uppercase tracking-[0.2em] text-text-muted">
               Español
             </h2>
             <div className="space-y-3 text-sm leading-relaxed text-text-secondary">
@@ -81,7 +81,7 @@ export function DisclaimerContent() {
 
           {/* English */}
           <section className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-text-muted">
+            <h2 className="font-mono-metrics text-xs uppercase tracking-[0.2em] text-text-muted">
               English
             </h2>
             <div className="space-y-3 text-sm leading-relaxed text-text-secondary">
@@ -136,7 +136,7 @@ export function DisclaimerContent() {
             type="button"
             onClick={handleAccept}
             disabled={!accepted || isPending}
-            className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-[#0A0E14] transition-colors hover:bg-accent-hover disabled:bg-border-default disabled:text-text-muted"
+            className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:bg-border-default disabled:text-text-muted"
           >
             {isPending ? '...' : t('acceptButton')}
           </button>
