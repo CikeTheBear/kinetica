@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeProgress, getWeekStart, type WorkoutLogRow } from '@/lib/progress';
+import {
+  computeProgress,
+  formatProgressSummary,
+  getWeekStart,
+  type WorkoutLogRow,
+} from '@/lib/progress';
 
 // Helper: formatea un Date a YYYY-MM-DD en componentes locales (como hace lib/progress).
 function ymd(date: Date): string {
@@ -110,5 +115,25 @@ describe('computeProgress', () => {
     // Se quedan las MÁS recientes: del 3 al 12 de marzo.
     expect(data.volumenPorSesion[0].fecha).toBe('2026-03-03');
     expect(data.volumenPorSesion[9].fecha).toBe('2026-03-12');
+  });
+});
+
+describe('formatProgressSummary', () => {
+  it('sin entrenos invita a empezar', () => {
+    const texto = formatProgressSummary(computeProgress([]), 'es');
+    expect(texto.toLowerCase()).toContain('no ha registrado');
+  });
+
+  it('incluye las cifras clave cuando hay datos', () => {
+    const rows: WorkoutLogRow[] = [
+      {
+        fecha: '2026-05-25',
+        ejercicio_nombre: 'Press banca',
+        sets: [{ serie: 1, peso_kg: 50, reps: 10, completado: true }], // 500 kg
+      },
+    ];
+    const texto = formatProgressSummary(computeProgress(rows), 'es');
+    expect(texto).toContain('Entrenos registrados: 1');
+    expect(texto).toContain('500 kg');
   });
 });
