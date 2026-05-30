@@ -23,10 +23,10 @@ function RegisterPageContent() {
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-text-primary">{t('register')}</h1>
-        <p className="mt-1 text-sm text-text-secondary">
-          Crea tu cuenta para empezar
-        </p>
+        <span className="t-display text-3xl tracking-tight text-text-primary">
+          KINÉ<span className="text-accent">TICA</span>
+        </span>
+        <p className="mt-2 text-sm text-text-secondary">{t('registerSubtitle')}</p>
       </div>
       <RegisterForm />
     </div>

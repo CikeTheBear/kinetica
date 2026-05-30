@@ -3,48 +3,83 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    /* Backgrounds */
-    --bg-base: #0A0E14;
-    --bg-elevated: #141A22;
-    --bg-overlay: #1E2733;
+  /* ============================================================
+     SISTEMA DE TEMAS
+     Cada tema define los mismos tokens (colores + roles de fuente).
+     next-themes pone data-theme="redline|kinetic" en <html>.
+     Default: redline (también si el atributo falta todavía).
+     ============================================================ */
 
-    /* Borders */
-    --border-subtle: #1E2733;
-    --border-default: #2A3441;
+  /* --- REDLINE · telemetría de motorsport (default) --- */
+  :root,
+  [data-theme='redline'] {
+    --bg-base: #06080c;
+    --bg-elevated: #0d1117;
+    --bg-overlay: #161d28;
+    --border-subtle: #161d28;
+    --border-default: #1b2230;
+    --text-primary: #eef2f6;
+    --text-secondary: #79839a;
+    --text-muted: #5a6473;
 
-    /* Text */
-    --text-primary: #E8EEF2;
-    --text-secondary: #8B98A8;
-    --text-muted: #5A6573;
-
-    /* Accent — amarillo nitro */
-    --accent: #E5FF00;
-    --accent-hover: #C8E000;
-    --accent-pressed: #A8BF00;
+    --accent: #e5ff00;
+    --accent-hover: #c8e000;
+    --accent-pressed: #a8bf00;
     --accent-muted: rgba(229, 255, 0, 0.08);
     --accent-glow: rgba(229, 255, 0, 0.25);
+    --on-accent: #06080c;
+    --accent-2: #ff3b30; /* rojo redline */
 
-    /* Text over accent — CRITICAL: always dark on yellow */
-    --on-accent: #0A0E14;
+    --font-display: var(--font-saira);
+    --font-body: var(--font-hanken);
+    --font-mono: var(--font-martian);
+    /* Saira es variable: usamos 800 para titulares. */
+    --display-weight: 800;
+    --display-tracking: -0.02em;
 
-    /* Status */
-    --status-success: #4ADE80;
-    --status-warning: #FFB547;
-    --status-danger: #FF5757;
-    --status-info: #5AB8FF;
+    --radius: 14px;
+    /* Textura de fondo del tema (líneas de medida sutiles). */
+    --app-bg:
+      linear-gradient(180deg, #070a0f, #06080c),
+      repeating-linear-gradient(0deg, transparent 0 39px, rgba(255, 255, 255, 0.018) 39px 40px);
+  }
 
-    /* Metrics */
-    --metric-weight: #5AB8FF;
-    --metric-muscle: #E5FF00;
-    --metric-fat: #FFB547;
-    --metric-hrv: #C77DFF;
-    --metric-sleep: #7AA8FF;
-    --metric-cardio: #FF7AB6;
+  /* --- KINETIC · editorial atlético / poster --- */
+  [data-theme='kinetic'] {
+    --bg-base: #0c0a09;
+    --bg-elevated: #171311;
+    --bg-overlay: #211a17;
+    --border-subtle: #211a17;
+    --border-default: #2c2420;
+    --text-primary: #fbf7f2;
+    --text-secondary: #9a8f86;
+    --text-muted: #6f655e;
+
+    --accent: #e5ff00;
+    --accent-hover: #d4ec00;
+    --accent-pressed: #b6cc00;
+    --accent-muted: rgba(229, 255, 0, 0.1);
+    --accent-glow: rgba(229, 255, 0, 0.22);
+    --on-accent: #0c0a09;
+    --accent-2: #ff2d7e; /* magenta eléctrico */
+
+    --font-display: var(--font-anton);
+    --font-body: var(--font-hanken);
+    --font-mono: var(--font-martian);
+    /* Anton solo tiene un peso (400); NO forzar bold (evita faux-bold feo). */
+    --display-weight: 400;
+    --display-tracking: 0.005em;
+
+    --radius: 18px;
+    /* Atmósfera con gradientes de color (haze magenta + nitro). */
+    --app-bg:
+      radial-gradient(900px 520px at 110% -5%, rgba(255, 45, 126, 0.18), transparent 60%),
+      radial-gradient(720px 520px at -10% 100%, rgba(229, 255, 0, 0.1), transparent 55%),
+      #0c0a09;
   }
 
   html {
-    font-family: var(--font-inter), system-ui, sans-serif;
+    font-family: var(--font-body), system-ui, sans-serif;
     background-color: var(--bg-base);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
@@ -53,11 +88,11 @@
 
   body {
     min-height: 100dvh;
-    /* Mobile-first: evitar bounce en iOS y asegurar scroll suave */
+    background: var(--app-bg);
+    background-attachment: fixed;
     overscroll-behavior-y: none;
   }
 
-  /* Scrollbar personalizada para dark mode */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -75,7 +110,55 @@
 }
 
 @layer utilities {
+  /* Métricas en mono — ahora apunta al rol de fuente del tema. */
   .font-mono-metrics {
-    font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  }
+
+  /* Variantes bespoke por tema: renderizamos ambas y mostramos la del tema
+     activo. SSR-safe y sin parpadeo (next-themes fija data-theme antes de pintar).
+     Fallback no-JS: si aún no hay atributo, mostramos Redline (el default). */
+  .only-redline,
+  .only-kinetic {
+    display: none;
+  }
+  [data-theme='redline'] .only-redline,
+  html:not([data-theme]) .only-redline {
+    display: revert;
+  }
+  [data-theme='kinetic'] .only-kinetic {
+    display: revert;
+  }
+
+  /* Titulares display: fuente + peso + tracking según el tema activo.
+     Usar esta clase en vez de `font-display font-bold` para que cada tema
+     aplique su peso correcto (Saira 800 vs Anton 400). */
+  .t-display {
+    font-family: var(--font-display), system-ui, sans-serif;
+    font-weight: var(--display-weight, 700);
+    letter-spacing: var(--display-tracking, -0.01em);
+  }
+
+  /* Entrada cinética: usado por el Dashboard (animate-[rise_...]). */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* Grano sutil reutilizable: añadir la clase a un overlay fijo. */
+  .grain-overlay::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 60;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 }

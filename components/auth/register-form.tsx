@@ -91,7 +91,7 @@ export function RegisterForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="mt-2 rounded-lg bg-accent py-3 text-sm font-semibold text-[#0A0E14] transition-colors hover:bg-accent-hover disabled:opacity-50"
+        className="mt-2 rounded-lg bg-accent py-3 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
       >
         {isLoading ? '...' : t('registerButton')}
       </button>

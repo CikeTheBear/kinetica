@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/navigation';
+import { PageContainer } from '@/components/page-container';
 import {
   parseRepsObjetivo,
   type EjercicioRegistro,
@@ -175,7 +176,7 @@ export function RuedoView({
     return (
       <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
         <CheckCircle2 size={56} className="mb-4 text-status-success" strokeWidth={1.5} />
-        <h2 className="text-xl font-semibold text-text-primary">{t('savedTitle')}</h2>
+        <h2 className="t-display text-2xl text-text-primary">{t('savedTitle')}</h2>
         <p className="mt-2 max-w-xs text-text-secondary">{t('savedBody')}</p>
         <button
           onClick={() => router.push('/plan')}
@@ -188,7 +189,7 @@ export function RuedoView({
   }
 
   return (
-    <div className="px-4 py-4">
+    <PageContainer>
       {/* Cabecera */}
       <div className="mb-4">
         <Link
@@ -200,7 +201,7 @@ export function RuedoView({
         </Link>
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-2xl font-semibold capitalize text-text-primary">
+            <h1 className="t-display text-3xl capitalize text-text-primary">
               {dia.dia}
             </h1>
             <p className="text-sm text-text-secondary">{dia.tipo}</p>
@@ -250,7 +251,7 @@ export function RuedoView({
           />
         )}
       </AnimatePresence>
-    </div>
+    </PageContainer>
   );
 }
 
