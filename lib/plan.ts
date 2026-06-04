@@ -26,6 +26,10 @@ const EjercicioSchema = z.object({
   rpe_objetivo: z.number().int().min(1).max(10).optional(),
   descanso_seg: z.number().int().min(0).optional(),
   notas_kai: z.string().optional(),
+  // Superserie: ejercicios consecutivos con el mismo valor (una letra: "A",
+  // "B"...) se ejecutan en ronda (A1→A2→...). Ausente = ejercicio individual.
+  // Opcional y retrocompatible: los planes sin este campo siguen siendo válidos.
+  grupo: z.string().max(3).optional(),
 });
 
 const DiaSchema = z.object({
@@ -125,13 +129,14 @@ async function generateAndValidatePlan(
           "peso_sugerido_kg": 40,
           "rpe_objetivo": 8,
           "descanso_seg": 90,
-          "notas_kai": "<notas técnicas o de ejecución>"
+          "notas_kai": "<notas técnicas o de ejecución>",
+          "grupo": "A"
         }
       ]
     }
   ]
 }
-Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de wger.de.`;
+Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de wger.de. El campo "grupo" es OPCIONAL (omítelo en ejercicios individuales); úsalo solo para superseries (ver regla 8).`;
 
   // Semilla de variación: se genera una por cada llamada (cada "Regenerar").
   // Cumple dos funciones:
@@ -351,6 +356,7 @@ REGLAS CRÍTICAS:
    - "en objetivo" → progresión ligera o mantener.
    - "sin RPE" → progresa con prudencia según si completó las series y reps planeadas.
    Explica brevemente en "notas_kai" el ajuste que hiciste respecto a la semana pasada. Si NO hay datos de rendimiento, parte de pesos sugeridos normales para su nivel.
+8. SUPERSERIES (opcional): puedes agrupar 2-3 ejercicios CONSECUTIVOS en una superserie poniéndoles el mismo valor en "grupo" (una letra: "A", "B"...). El "grupo" es de SUPERSERIE, no tiene nada que ver con el grupo muscular del catálogo. Úsalo solo cuando aporte (antagonistas, eficiencia de tiempo); el "descanso_seg" de esos ejercicios se entiende TRAS completar la ronda del grupo. La mayoría de ejercicios deben ir SUELTOS (sin "grupo"). No abuses.
 
 ${context}
 ${progresionBlock}

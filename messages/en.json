@@ -75,7 +75,8 @@
     "generating": "Generating...",
     "weekOf": "Week of",
     "errorGenerating": "Couldn't generate the plan. Please try again.",
-    "trainButton": "Train"
+    "trainButton": "Train",
+    "superset": "Superset {grupo}"
   },
   "ruedo": {
     "backToPlan": "Back to plan",
@@ -99,7 +100,8 @@
     "rpePrompt": "Effort",
     "rpe_facil": "Easy",
     "rpe_justo": "On point",
-    "rpe_duro": "Hard"
+    "rpe_duro": "Hard",
+    "superset": "Superset {grupo}"
   },
   "coach": {
     "title": "Coach Kai",

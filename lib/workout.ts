@@ -54,6 +54,42 @@ export const RPE_NIVELES = [
 export type RpeNivelId = (typeof RPE_NIVELES)[number]['id'];
 
 /**
+ * Un grupo de ejercicios para renderizar: o una superserie (varios ejercicios
+ * con el mismo `grupo`, ejecutados en ronda) o un ejercicio individual.
+ */
+export interface ExerciseGroup<T> {
+  grupo?: string; // letra de la superserie; undefined si es ejercicio solo
+  ejercicios: T[]; // 1 si es individual; 2+ si es superserie
+}
+
+/**
+ * Agrupa ejercicios CONSECUTIVOS que comparten el mismo `grupo` (superserie).
+ * Los ejercicios sin `grupo` quedan cada uno en su propio grupo individual.
+ *
+ * Es genérico (sirve para la forma del plan y para la del Ruedo) y puro, así que
+ * lo reutilizan la vista del Plan y el Ruedo, y se puede testear aislado.
+ *
+ * "Consecutivos": una superserie es A1→A2 adyacentes. Si dos ejercicios tienen
+ * el mismo grupo pero no están seguidos, se tratan como grupos separados (no
+ * reordenamos lo que mandó el plan).
+ */
+export function groupBySuperset<T extends { grupo?: string }>(
+  ejercicios: T[]
+): ExerciseGroup<T>[] {
+  const groups: ExerciseGroup<T>[] = [];
+  for (const ej of ejercicios) {
+    const last = groups[groups.length - 1];
+    // Se une al grupo anterior solo si ambos tienen el MISMO grupo no vacío.
+    if (ej.grupo && last && last.grupo === ej.grupo) {
+      last.ejercicios.push(ej);
+    } else {
+      groups.push({ grupo: ej.grupo || undefined, ejercicios: [ej] });
+    }
+  }
+  return groups;
+}
+
+/**
  * Un ejercicio con todas sus series registradas. Cada uno se persiste como
  * UNA fila en workout_logs (con `series` dentro de la columna jsonb `sets`).
  */

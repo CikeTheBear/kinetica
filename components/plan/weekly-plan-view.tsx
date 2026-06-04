@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame, Play } from 'lucide-react';
+import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame, Play, Repeat } from 'lucide-react';
 import { Link } from '@/navigation';
 import { cn } from '@/lib/utils';
 import { PageContainer } from '@/components/page-container';
+import { groupBySuperset } from '@/lib/workout';
 
 interface PlanSemanal {
   id: string;
@@ -27,6 +28,7 @@ interface PlanSemanal {
         rpe_objetivo?: number;
         descanso_seg?: number;
         notas_kai?: string;
+        grupo?: string;
       }>;
     }>;
   };
@@ -162,6 +164,15 @@ function DayCard({
   const t = useTranslations('plan');
   const isRestDay = dia.es_descanso;
 
+  // Agrupar por superserie, llevando el índice global (1..N) para la numeración
+  // de cada ejercicio sin importar cómo queden agrupados.
+  let acc = 0;
+  const grupos = groupBySuperset(dia.ejercicios).map((g) => {
+    const start = acc;
+    acc += g.ejercicios.length;
+    return { grupo: g.grupo, ejercicios: g.ejercicios, start };
+  });
+
   return (
     <motion.div
       layout
@@ -224,13 +235,31 @@ function DayCard({
             className="overflow-hidden"
           >
             <div className="mt-3 space-y-2 border-t border-border-subtle pt-3">
-              {dia.ejercicios.map((ejercicio, index) => (
-                <ExerciseRow
-                  key={index}
-                  ejercicio={ejercicio}
-                  index={index}
-                />
-              ))}
+              {grupos.map((group, gi) =>
+                group.grupo && group.ejercicios.length > 1 ? (
+                  // Superserie: ejercicios enmarcados bajo una etiqueta "Superserie A".
+                  <div
+                    key={`g-${gi}`}
+                    className="rounded-lg border border-accent/30 bg-accent/5 p-2"
+                  >
+                    <p className="mb-1.5 flex items-center gap-1.5 px-1 font-mono-metrics text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                      <Repeat size={12} strokeWidth={2} />
+                      {t('superset', { grupo: group.grupo })}
+                    </p>
+                    <div className="space-y-1.5">
+                      {group.ejercicios.map((ejercicio, i) => (
+                        <ExerciseRow key={i} ejercicio={ejercicio} index={group.start + i} />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <ExerciseRow
+                    key={`s-${gi}`}
+                    ejercicio={group.ejercicios[0]}
+                    index={group.start}
+                  />
+                )
+              )}
 
               {/* CTA para entrar a "En el Ruedo" y ejecutar este día. */}
               <Link

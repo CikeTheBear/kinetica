@@ -75,7 +75,8 @@
     "generating": "Generando...",
     "weekOf": "Semana del",
     "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo.",
-    "trainButton": "Entrenar"
+    "trainButton": "Entrenar",
+    "superset": "Superserie {grupo}"
   },
   "ruedo": {
     "backToPlan": "Volver al plan",
@@ -99,7 +100,8 @@
     "rpePrompt": "Esfuerzo",
     "rpe_facil": "Fácil",
     "rpe_justo": "Justo",
-    "rpe_duro": "Duro"
+    "rpe_duro": "Duro",
+    "superset": "Superserie {grupo}"
   },
   "coach": {
     "title": "Coach Kai",
