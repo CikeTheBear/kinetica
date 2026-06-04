@@ -6,7 +6,6 @@
   "navigation": {
     "dashboard": "Home",
     "plan": "Plan",
-    "body": "Body",
     "coach": "Coach"
   },
   "auth": {
@@ -117,7 +116,8 @@
     "theme_kinetic_desc": "Athletic poster. Vibrant, motivating, full of energy."
   },
   "biometrics": {
-    "navLabel": "Body",
+    "cardTitle": "Body",
+    "cardBody": "Log your weight and composition, and track your evolution.",
     "title": "Your body",
     "currentWeight": "Current weight",
     "vsPrev": "vs. previous",

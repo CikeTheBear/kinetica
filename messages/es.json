@@ -6,7 +6,6 @@
   "navigation": {
     "dashboard": "Inicio",
     "plan": "Plan",
-    "body": "Cuerpo",
     "coach": "Coach"
   },
   "auth": {
@@ -117,7 +116,8 @@
     "theme_kinetic_desc": "Poster atlético. Vibrante, motivador, con energía."
   },
   "biometrics": {
-    "navLabel": "Cuerpo",
+    "cardTitle": "Cuerpo",
+    "cardBody": "Registra tu peso y composición, y mira tu evolución.",
     "title": "Tu cuerpo",
     "currentWeight": "Peso actual",
     "vsPrev": "vs. anterior",

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { ArrowRight, Trophy, TrendingUp } from 'lucide-react';
+import { ArrowRight, Trophy, TrendingUp, Scale } from 'lucide-react';
 import { Link } from '@/navigation';
 import type { ProgressData } from '@/lib/progress';
 import { PageContainer } from '@/components/page-container';
@@ -35,6 +35,7 @@ export function DashboardView({
   const t = useTranslations('dashboard');
   const tp = useTranslations('progress');
   const tr = useTranslations('records');
+  const tb = useTranslations('biometrics');
 
   return (
     <PageContainer>
@@ -76,8 +77,9 @@ export function DashboardView({
             <DashboardKinetic progress={progress} />
           </div>
 
-          {/* Acceso a la vista de récords por ejercicio (PRs + e1RM). Como la
-              bottom-nav no tiene hueco para más ítems, se enlaza desde aquí. */}
+          {/* Acceso a récords por ejercicio (PRs + e1RM). Por decisión de IA, las
+              secciones de seguimiento (Récords y Cuerpo) viven como cards del
+              dashboard, no en la nav principal (reservada a Inicio/Plan/Coach). */}
           <Link
             href="/progress"
             className="mt-4 flex items-center gap-3 rounded-xl border border-border-default bg-bg-elevated p-4 transition-colors hover:bg-accent/5"
@@ -90,6 +92,23 @@ export function DashboardView({
             <ArrowRight size={18} strokeWidth={1.5} className="shrink-0 text-text-muted" />
           </Link>
         </div>
+      )}
+
+      {/* Acceso al registro biométrico (pesaje + composición). Independiente de
+          los logs: puedes pesarte aunque aún no hayas entrenado, por eso cuelga
+          de onboardingCompleted y no de hasLogs. */}
+      {onboardingCompleted && (
+        <Link
+          href="/biometrics"
+          className="mt-4 flex items-center gap-3 rounded-xl border border-border-default bg-bg-elevated p-4 transition-colors hover:bg-accent/5"
+        >
+          <Scale size={20} strokeWidth={1.5} className="text-accent" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-text-primary">{tb('cardTitle')}</p>
+            <p className="mt-0.5 text-xs text-text-secondary">{tb('cardBody')}</p>
+          </div>
+          <ArrowRight size={18} strokeWidth={1.5} className="shrink-0 text-text-muted" />
+        </Link>
       )}
     </PageContainer>
   );
