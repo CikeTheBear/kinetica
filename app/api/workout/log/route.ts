@@ -19,6 +19,8 @@ const SerieSchema = z.object({
   peso_kg: z.number().min(0),
   reps: z.number().int().min(0),
   completado: z.boolean(),
+  // RPE real opcional (1-10): esfuerzo percibido tras completar la serie.
+  rpe: z.number().int().min(1).max(10).optional(),
 });
 
 const EjercicioSchema = z.object({

@@ -3,6 +3,7 @@
 import { Check, Minus, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { RPE_NIVELES } from '@/lib/workout';
 import type { EjercicioRegistro, SerieRegistro } from '@/lib/workout';
 
 // Incrementos de los botones +/-. 2.5 kg es el salto típico de discos pequeños.
@@ -125,6 +126,38 @@ export function ExerciseTracker({
             >
               <Check size={18} strokeWidth={serie.completado ? 2.5 : 1.5} />
             </button>
+
+            {/* Selector de RPE real: aparece SOLO al completar la serie.
+                Contextual (valoras el esfuerzo tras hacerla) y opcional. Ocupa
+                toda la fila del grid (col-span-full) bajo los controles. */}
+            {serie.completado && (
+              <div className="col-span-full mt-0.5 flex items-center gap-1.5 px-1">
+                <span className="font-mono-metrics text-[10px] uppercase tracking-wide text-text-muted">
+                  {t('rpePrompt')}
+                </span>
+                {RPE_NIVELES.map((nivel) => (
+                  <button
+                    key={nivel.id}
+                    type="button"
+                    // Toggle: re-tocar el nivel activo lo desmarca (rpe → undefined).
+                    onClick={() =>
+                      onChangeSerie(index, {
+                        rpe: serie.rpe === nivel.valor ? undefined : nivel.valor,
+                      })
+                    }
+                    aria-pressed={serie.rpe === nivel.valor}
+                    className={cn(
+                      'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                      serie.rpe === nivel.valor
+                        ? 'bg-accent text-on-accent'
+                        : 'bg-bg-base text-text-secondary hover:text-text-primary'
+                    )}
+                  >
+                    {t(`rpe_${nivel.id}`)}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>

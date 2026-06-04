@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { getUserContext } from '@/lib/memory';
 import { getCatalogForUser } from '@/lib/wger';
+import { getProgressionSummary } from '@/lib/progression';
 import { z } from 'zod';
 
 /**
@@ -295,6 +296,14 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
   const { context } = await getUserContext(userId);
   const locale = profile.locale || 'es';
 
+  // 4a-bis. Resumen de rendimiento de la semana en curso (plan vs realidad +
+  // RPE real). Es la señal que permite a Kai progresar la carga con datos.
+  // null si es la primera semana o no hay entrenos registrados.
+  const progresion = await getProgressionSummary(userId);
+  const progresionBlock = progresion
+    ? `\n${progresion}\n`
+    : '\n(Sin datos de rendimiento de semanas anteriores: primera semana o sin entrenos registrados. Parte de pesos sugeridos normales para su nivel.)\n';
+
   // 4b. Cargar el catálogo de ejercicios accesible según el equipamiento del
   // usuario. El LLM elegirá SOLO de esta lista (con wger_id reales), de modo que
   // no pueda inventar ejercicios inexistentes. Esto requiere que exercises_cache
@@ -336,9 +345,15 @@ REGLAS CRÍTICAS:
 4. Adapta volumen e intensidad al nivel de experiencia del usuario.
 5. Incluye al menos 1-2 días de descanso activo o completo.
 6. La duración estimada debe ser realista (45-90 min para días de gym).
+7. PROGRESIÓN: aplica sobrecarga progresiva basándote en el RENDIMIENTO de la semana en curso (si aparece más abajo), ejercicio por ejercicio:
+   - "sobró margen" (RPE real bastante por debajo del objetivo) → sube el peso ~2.5-5%; en ejercicios de peso corporal, añade 1-2 reps.
+   - "al límite" (RPE real igual o por encima del objetivo, o cerca de 10) → mantén el peso o redúcelo ligeramente; prioriza técnica.
+   - "en objetivo" → progresión ligera o mantener.
+   - "sin RPE" → progresa con prudencia según si completó las series y reps planeadas.
+   Explica brevemente en "notas_kai" el ajuste que hiciste respecto a la semana pasada. Si NO hay datos de rendimiento, parte de pesos sugeridos normales para su nivel.
 
 ${context}
-
+${progresionBlock}
 === CATÁLOGO DE EJERCICIOS DISPONIBLES (formato: wger_id | nombre | grupo muscular) ===
 ${catalogoText}
 === FIN DEL CATÁLOGO ===
