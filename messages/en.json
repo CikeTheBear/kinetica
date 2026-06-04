@@ -49,6 +49,21 @@
     "train": "Train",
     "today": "Today"
   },
+  "records": {
+    "title": "Records",
+    "subtitle": "Your personal bests and the progression of each exercise.",
+    "cardTitle": "Records per exercise",
+    "cardBody": "See your PRs and how each lift is progressing.",
+    "loading": "Loading records...",
+    "error": "Couldn't load your records. Please try again.",
+    "emptyTitle": "No records yet",
+    "emptyBody": "Complete sets in your workouts and you'll see your per-exercise bests here.",
+    "prWeight": "Max weight",
+    "prE1rm": "Est. 1RM",
+    "prReps": "Max reps",
+    "sessionCount": "{count, plural, one {# session} other {# sessions}}",
+    "needMoreSessions": "You need at least two sessions to see the progression."
+  },
   "plan": {
     "title": "Weekly plan",
     "emptyState": "You don't have an active plan. Ask Kai to generate one.",
@@ -80,7 +95,11 @@
     "colSet": "Set",
     "colWeight": "Weight",
     "colReps": "Reps",
-    "completeSet": "Complete set"
+    "completeSet": "Complete set",
+    "rpePrompt": "Effort",
+    "rpe_facil": "Easy",
+    "rpe_justo": "On point",
+    "rpe_duro": "Hard"
   },
   "coach": {
     "title": "Coach Kai",
@@ -95,6 +114,31 @@
     "theme_redline_desc": "High-performance telemetry. Sober, technical, precise.",
     "theme_kinetic": "Kinetic",
     "theme_kinetic_desc": "Athletic poster. Vibrant, motivating, full of energy."
+  },
+  "biometrics": {
+    "cardTitle": "Body",
+    "cardBody": "Log your weight and composition, and track your evolution.",
+    "title": "Your body",
+    "currentWeight": "Current weight",
+    "vsPrev": "vs. previous",
+    "kgUnit": "kg",
+    "formTitle": "Log a weigh-in",
+    "formSubtitle": "Record today's weight. Body composition is optional.",
+    "weightLabel": "Weight",
+    "compositionToggle": "Body composition (optional)",
+    "fatLabel": "Fat",
+    "muscleLabel": "Muscle",
+    "waterLabel": "Water",
+    "proteinLabel": "Protein",
+    "visceralLabel": "Visceral fat",
+    "saveButton": "Save weigh-in",
+    "saving": "Saving...",
+    "saveError": "Couldn't save the weigh-in. Please try again.",
+    "errorWeightRequired": "Enter a valid weight greater than 0.",
+    "chartTitle": "Weight evolution",
+    "chartSubtitle": "Your logged weigh-ins over time",
+    "emptyTitle": "No weigh-ins yet",
+    "emptyBody": "Log your first weigh-in above and you'll see your evolution here."
   },
   "disclaimer": {
     "title": "Important medical notice",

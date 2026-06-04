@@ -49,6 +49,21 @@
     "train": "Entrenar",
     "today": "Hoy"
   },
+  "records": {
+    "title": "Récords",
+    "subtitle": "Tus marcas personales y la evolución de cada ejercicio.",
+    "cardTitle": "Récords por ejercicio",
+    "cardBody": "Mira tus PRs y cómo evoluciona cada levantamiento.",
+    "loading": "Cargando récords...",
+    "error": "No se pudieron cargar los récords. Inténtalo de nuevo.",
+    "emptyTitle": "Aún no hay récords",
+    "emptyBody": "Completa series en tus entrenamientos y aquí verás tus marcas por ejercicio.",
+    "prWeight": "Peso máx",
+    "prE1rm": "1RM est.",
+    "prReps": "Reps máx",
+    "sessionCount": "{count, plural, one {# sesión} other {# sesiones}}",
+    "needMoreSessions": "Necesitas al menos dos sesiones para ver la evolución."
+  },
   "plan": {
     "title": "Plan semanal",
     "emptyState": "No tienes un plan activo. Pídele a Kai que te genere uno.",
@@ -80,7 +95,11 @@
     "colSet": "Serie",
     "colWeight": "Peso",
     "colReps": "Reps",
-    "completeSet": "Completar serie"
+    "completeSet": "Completar serie",
+    "rpePrompt": "Esfuerzo",
+    "rpe_facil": "Fácil",
+    "rpe_justo": "Justo",
+    "rpe_duro": "Duro"
   },
   "coach": {
     "title": "Coach Kai",
@@ -95,6 +114,31 @@
     "theme_redline_desc": "Telemetría de alto rendimiento. Sobrio, técnico, preciso.",
     "theme_kinetic": "Kinetic",
     "theme_kinetic_desc": "Poster atlético. Vibrante, motivador, con energía."
+  },
+  "biometrics": {
+    "cardTitle": "Cuerpo",
+    "cardBody": "Registra tu peso y composición, y mira tu evolución.",
+    "title": "Tu cuerpo",
+    "currentWeight": "Peso actual",
+    "vsPrev": "vs. anterior",
+    "kgUnit": "kg",
+    "formTitle": "Registrar pesaje",
+    "formSubtitle": "Apunta tu peso de hoy. La composición es opcional.",
+    "weightLabel": "Peso",
+    "compositionToggle": "Composición corporal (opcional)",
+    "fatLabel": "Grasa",
+    "muscleLabel": "Músculo",
+    "waterLabel": "Agua",
+    "proteinLabel": "Proteína",
+    "visceralLabel": "Grasa visceral",
+    "saveButton": "Guardar pesaje",
+    "saving": "Guardando...",
+    "saveError": "No se pudo guardar el pesaje. Inténtalo de nuevo.",
+    "errorWeightRequired": "Introduce un peso válido mayor que 0.",
+    "chartTitle": "Evolución del peso",
+    "chartSubtitle": "Tus pesajes registrados a lo largo del tiempo",
+    "emptyTitle": "Aún no hay pesajes",
+    "emptyBody": "Registra tu primer pesaje arriba y aquí verás tu evolución."
   },
   "disclaimer": {
     "title": "Aviso médico importante",
