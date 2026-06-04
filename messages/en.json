@@ -80,7 +80,11 @@
     "colSet": "Set",
     "colWeight": "Weight",
     "colReps": "Reps",
-    "completeSet": "Complete set"
+    "completeSet": "Complete set",
+    "rpePrompt": "Effort",
+    "rpe_facil": "Easy",
+    "rpe_justo": "On point",
+    "rpe_duro": "Hard"
   },
   "coach": {
     "title": "Coach Kai",

@@ -80,7 +80,11 @@
     "colSet": "Serie",
     "colWeight": "Peso",
     "colReps": "Reps",
-    "completeSet": "Completar serie"
+    "completeSet": "Completar serie",
+    "rpePrompt": "Esfuerzo",
+    "rpe_facil": "Fácil",
+    "rpe_justo": "Justo",
+    "rpe_duro": "Duro"
   },
   "coach": {
     "title": "Coach Kai",

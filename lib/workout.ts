@@ -28,7 +28,30 @@ export interface SerieRegistro {
   peso_kg: number;
   reps: number;
   completado: boolean;
+  // RPE real (Rate of Perceived Exertion, 1-10): cómo se sintió la serie DE
+  // VERDAD, capturado tras completarla. Es la señal que alimenta el motor de
+  // progresión: comparado contra rpe_objetivo del plan, le dice a Kai si subir
+  // carga (sobró) o mantener/bajar (al límite). Opcional: si el usuario no lo
+  // marca, simplemente no hay dato de esfuerzo para esa serie.
+  rpe?: number;
 }
+
+/**
+ * Niveles de esfuerzo percibido que ofrecemos al usuario tras completar una
+ * serie. Tres cubos en vez de una escala 1-10 para bajar la fricción a un tap
+ * durante el entreno. El valor numérico es lo que se guarda y lo que el motor
+ * de progresión compara contra el rpe_objetivo del plan:
+ *  - facil: sobraron reps (~4 en reserva)  → señal de subir carga
+ *  - justo: cerca del objetivo típico (~2 en reserva)
+ *  - duro:  al límite / fallo técnico (0-1 en reserva) → mantener o bajar
+ */
+export const RPE_NIVELES = [
+  { id: 'facil', valor: 6 },
+  { id: 'justo', valor: 8 },
+  { id: 'duro', valor: 10 },
+] as const;
+
+export type RpeNivelId = (typeof RPE_NIVELES)[number]['id'];
 
 /**
  * Un ejercicio con todas sus series registradas. Cada uno se persiste como
