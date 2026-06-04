@@ -6,6 +6,7 @@
   "navigation": {
     "dashboard": "Inicio",
     "plan": "Plan",
+    "body": "Cuerpo",
     "coach": "Coach"
   },
   "auth": {
@@ -114,6 +115,30 @@
     "theme_redline_desc": "Telemetría de alto rendimiento. Sobrio, técnico, preciso.",
     "theme_kinetic": "Kinetic",
     "theme_kinetic_desc": "Poster atlético. Vibrante, motivador, con energía."
+  },
+  "biometrics": {
+    "navLabel": "Cuerpo",
+    "title": "Tu cuerpo",
+    "currentWeight": "Peso actual",
+    "vsPrev": "vs. anterior",
+    "kgUnit": "kg",
+    "formTitle": "Registrar pesaje",
+    "formSubtitle": "Apunta tu peso de hoy. La composición es opcional.",
+    "weightLabel": "Peso",
+    "compositionToggle": "Composición corporal (opcional)",
+    "fatLabel": "Grasa",
+    "muscleLabel": "Músculo",
+    "waterLabel": "Agua",
+    "proteinLabel": "Proteína",
+    "visceralLabel": "Grasa visceral",
+    "saveButton": "Guardar pesaje",
+    "saving": "Guardando...",
+    "saveError": "No se pudo guardar el pesaje. Inténtalo de nuevo.",
+    "errorWeightRequired": "Introduce un peso válido mayor que 0.",
+    "chartTitle": "Evolución del peso",
+    "chartSubtitle": "Tus pesajes registrados a lo largo del tiempo",
+    "emptyTitle": "Aún no hay pesajes",
+    "emptyBody": "Registra tu primer pesaje arriba y aquí verás tu evolución."
   },
   "disclaimer": {
     "title": "Aviso médico importante",

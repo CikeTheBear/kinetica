@@ -6,6 +6,7 @@
   "navigation": {
     "dashboard": "Home",
     "plan": "Plan",
+    "body": "Body",
     "coach": "Coach"
   },
   "auth": {
@@ -114,6 +115,30 @@
     "theme_redline_desc": "High-performance telemetry. Sober, technical, precise.",
     "theme_kinetic": "Kinetic",
     "theme_kinetic_desc": "Athletic poster. Vibrant, motivating, full of energy."
+  },
+  "biometrics": {
+    "navLabel": "Body",
+    "title": "Your body",
+    "currentWeight": "Current weight",
+    "vsPrev": "vs. previous",
+    "kgUnit": "kg",
+    "formTitle": "Log a weigh-in",
+    "formSubtitle": "Record today's weight. Body composition is optional.",
+    "weightLabel": "Weight",
+    "compositionToggle": "Body composition (optional)",
+    "fatLabel": "Fat",
+    "muscleLabel": "Muscle",
+    "waterLabel": "Water",
+    "proteinLabel": "Protein",
+    "visceralLabel": "Visceral fat",
+    "saveButton": "Save weigh-in",
+    "saving": "Saving...",
+    "saveError": "Couldn't save the weigh-in. Please try again.",
+    "errorWeightRequired": "Enter a valid weight greater than 0.",
+    "chartTitle": "Weight evolution",
+    "chartSubtitle": "Your logged weigh-ins over time",
+    "emptyTitle": "No weigh-ins yet",
+    "emptyBody": "Log your first weigh-in above and you'll see your evolution here."
   },
   "disclaimer": {
     "title": "Important medical notice",
