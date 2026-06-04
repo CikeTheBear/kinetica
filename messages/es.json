@@ -49,6 +49,21 @@
     "train": "Entrenar",
     "today": "Hoy"
   },
+  "records": {
+    "title": "Récords",
+    "subtitle": "Tus marcas personales y la evolución de cada ejercicio.",
+    "cardTitle": "Récords por ejercicio",
+    "cardBody": "Mira tus PRs y cómo evoluciona cada levantamiento.",
+    "loading": "Cargando récords...",
+    "error": "No se pudieron cargar los récords. Inténtalo de nuevo.",
+    "emptyTitle": "Aún no hay récords",
+    "emptyBody": "Completa series en tus entrenamientos y aquí verás tus marcas por ejercicio.",
+    "prWeight": "Peso máx",
+    "prE1rm": "1RM est.",
+    "prReps": "Reps máx",
+    "sessionCount": "{count, plural, one {# sesión} other {# sesiones}}",
+    "needMoreSessions": "Necesitas al menos dos sesiones para ver la evolución."
+  },
   "plan": {
     "title": "Plan semanal",
     "emptyState": "No tienes un plan activo. Pídele a Kai que te genere uno.",
