@@ -75,7 +75,15 @@
     "generating": "Generando...",
     "weekOf": "Semana del",
     "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo.",
-    "trainButton": "Entrenar"
+    "trainButton": "Entrenar",
+    "superset": "Superserie {grupo}",
+    "blockWeek": "Semana {semana}/{total}",
+    "deload": "Descarga",
+    "startBlock": "Empezar bloque",
+    "nextWeek": "Siguiente semana",
+    "blockWeeks": "Semanas",
+    "blockObjectivePlaceholder": "Objetivo del bloque (opcional): p. ej. hipertrofia",
+    "starting": "Empezando..."
   },
   "ruedo": {
     "backToPlan": "Volver al plan",
@@ -99,7 +107,8 @@
     "rpePrompt": "Esfuerzo",
     "rpe_facil": "Fácil",
     "rpe_justo": "Justo",
-    "rpe_duro": "Duro"
+    "rpe_duro": "Duro",
+    "superset": "Superserie {grupo}"
   },
   "coach": {
     "title": "Coach Kai",

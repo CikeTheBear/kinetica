@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame, Play } from 'lucide-react';
+import { Dumbbell, Clock, ChevronDown, ChevronUp, Flame, Play, Repeat, Layers, ArrowRight } from 'lucide-react';
 import { Link } from '@/navigation';
 import { cn } from '@/lib/utils';
 import { PageContainer } from '@/components/page-container';
+import { groupBySuperset } from '@/lib/workout';
 
 interface PlanSemanal {
   id: string;
@@ -27,21 +28,36 @@ interface PlanSemanal {
         rpe_objetivo?: number;
         descanso_seg?: number;
         notas_kai?: string;
+        grupo?: string;
       }>;
     }>;
   };
+}
+
+// Info mínima del mesociclo activo que necesita la UI del plan.
+interface MesocycleInfo {
+  id: string;
+  nombre: string;
+  objetivo: string | null;
+  num_semanas: number;
+  semana_actual: number;
 }
 
 export function WeeklyPlanView() {
   const t = useTranslations('plan');
   const locale = useLocale();
   const [plan, setPlan] = useState<PlanSemanal | null>(null);
+  const [mesocycle, setMesocycle] = useState<MesocycleInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [showBlockForm, setShowBlockForm] = useState(false);
+  const [blockObjetivo, setBlockObjetivo] = useState('');
+  const [blockSemanas, setBlockSemanas] = useState(4);
 
   useEffect(() => {
     fetchActivePlan();
+    fetchMesocycle();
   }, []);
 
   async function fetchActivePlan() {
@@ -59,28 +75,58 @@ export function WeeklyPlanView() {
     }
   }
 
-  async function handleGeneratePlan() {
+  async function fetchMesocycle() {
+    try {
+      const response = await fetch('/api/mesocycle', { cache: 'no-store' });
+      if (response.ok) {
+        const data = await response.json();
+        setMesocycle(data.mesocycle ?? null);
+      }
+    } catch {
+      // No es crítico: si falla, la UI cae al modo "semana suelta".
+    }
+  }
+
+  // Helper común a todas las acciones que devuelven un plan (generar/regenerar
+  // semana suelta, empezar bloque, avanzar/regenerar semana del bloque).
+  async function runPlanAction(url: string, body?: unknown) {
     setGenerating(true);
     try {
-      const response = await fetch('/api/plan/generate', {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
+        body: body ? JSON.stringify(body) : undefined,
       });
-
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        const data = await response.json();
         setPlan(data.plan);
+        await fetchMesocycle(); // el bloque pudo cambiar (empezar/avanzar)
       } else {
-        const error = await response.json();
-        alert(error.error || t('errorGenerating'));
+        alert(data.error || t('errorGenerating'));
       }
-    } catch (error) {
+    } catch {
       alert(t('errorGenerating'));
     } finally {
       setGenerating(false);
     }
   }
+
+  // Semana suelta (sin bloque) o primer plan desde el empty state.
+  const handleGeneratePlan = () => runPlanAction('/api/plan/generate');
+  // Regenerar: si hay bloque activo, regenera la semana del bloque; si no, suelta.
+  const handleRegenerate = () =>
+    mesocycle
+      ? runPlanAction('/api/mesocycle/week', { action: 'regenerate' })
+      : runPlanAction('/api/plan/generate');
+  const handleAdvanceWeek = () => runPlanAction('/api/mesocycle/week', { action: 'advance' });
+  const handleStartBlock = async () => {
+    await runPlanAction('/api/mesocycle', {
+      objetivo: blockObjetivo.trim() || undefined,
+      numSemanas: blockSemanas,
+    });
+    setShowBlockForm(false);
+  };
 
   if (loading) {
     return (
@@ -108,26 +154,106 @@ export function WeeklyPlanView() {
   }
 
   const dias = plan.plan_json.dias;
+  // Derivados del bloque para la UI.
+  const isDeload = mesocycle
+    ? mesocycle.num_semanas >= 2 && mesocycle.semana_actual === mesocycle.num_semanas
+    : false;
+  const canAdvance = mesocycle ? mesocycle.semana_actual < mesocycle.num_semanas : false;
 
   return (
     <PageContainer>
       {/* Header del plan */}
       <div className="mb-4 rounded-xl bg-bg-elevated p-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="t-display text-xl text-text-primary">{t('title')}</h2>
             <p className="mt-1 font-mono-metrics text-[10px] uppercase tracking-[0.16em] text-text-muted">
               {t('weekOf')} {formatDate(plan.semana_inicio, locale)}
             </p>
+            {/* Contexto del bloque (mesociclo) */}
+            {mesocycle && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded bg-accent/10 px-2 py-0.5 font-mono-metrics text-[10px] font-semibold uppercase tracking-wide text-accent">
+                  <Layers size={11} strokeWidth={2} />
+                  {t('blockWeek', {
+                    semana: mesocycle.semana_actual,
+                    total: mesocycle.num_semanas,
+                  })}
+                </span>
+                {isDeload && (
+                  <span className="rounded bg-accent-2/15 px-2 py-0.5 font-mono-metrics text-[10px] font-semibold uppercase tracking-wide text-accent-2">
+                    {t('deload')}
+                  </span>
+                )}
+                <span className="truncate text-[11px] text-text-muted">{mesocycle.nombre}</span>
+              </div>
+            )}
           </div>
-          <button
-            onClick={handleGeneratePlan}
-            disabled={generating}
-            className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
-          >
-            {generating ? '...' : t('regenerateButton')}
-          </button>
+
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <button
+              onClick={handleRegenerate}
+              disabled={generating}
+              className="rounded-lg bg-bg-overlay px-4 py-2 text-xs font-semibold text-text-primary transition-colors hover:bg-bg-overlay/70 disabled:opacity-50"
+            >
+              {generating ? '...' : t('regenerateButton')}
+            </button>
+            {mesocycle ? (
+              canAdvance && (
+                <button
+                  onClick={handleAdvanceWeek}
+                  disabled={generating}
+                  className="inline-flex items-center gap-1 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
+                >
+                  {t('nextWeek')}
+                  <ArrowRight size={14} strokeWidth={2} />
+                </button>
+              )
+            ) : (
+              <button
+                onClick={() => setShowBlockForm((v) => !v)}
+                disabled={generating}
+                className="rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
+              >
+                {t('startBlock')}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Form para empezar un bloque (solo cuando no hay uno activo) */}
+        {!mesocycle && showBlockForm && (
+          <div className="mt-3 space-y-2 rounded-lg border border-border-subtle bg-bg-overlay/40 p-3">
+            <input
+              value={blockObjetivo}
+              onChange={(e) => setBlockObjetivo(e.target.value)}
+              placeholder={t('blockObjectivePlaceholder')}
+              className="w-full rounded bg-bg-base px-2 py-1.5 text-sm text-text-primary outline-none placeholder:text-text-muted"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-text-secondary">{t('blockWeeks')}</label>
+              <select
+                value={blockSemanas}
+                onChange={(e) => setBlockSemanas(Number(e.target.value))}
+                className="rounded bg-bg-base px-2 py-1 text-sm text-text-primary outline-none"
+              >
+                {[3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={handleStartBlock}
+                disabled={generating}
+                className="ml-auto rounded-lg bg-accent px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
+              >
+                {generating ? t('starting') : t('startBlock')}
+              </button>
+            </div>
+          </div>
+        )}
+
         {plan.notas_bloque && (
           <p className="mt-3 text-sm text-text-secondary">{plan.notas_bloque}</p>
         )}
@@ -161,6 +287,15 @@ function DayCard({
 }) {
   const t = useTranslations('plan');
   const isRestDay = dia.es_descanso;
+
+  // Agrupar por superserie, llevando el índice global (1..N) para la numeración
+  // de cada ejercicio sin importar cómo queden agrupados.
+  let acc = 0;
+  const grupos = groupBySuperset(dia.ejercicios).map((g) => {
+    const start = acc;
+    acc += g.ejercicios.length;
+    return { grupo: g.grupo, ejercicios: g.ejercicios, start };
+  });
 
   return (
     <motion.div
@@ -224,13 +359,31 @@ function DayCard({
             className="overflow-hidden"
           >
             <div className="mt-3 space-y-2 border-t border-border-subtle pt-3">
-              {dia.ejercicios.map((ejercicio, index) => (
-                <ExerciseRow
-                  key={index}
-                  ejercicio={ejercicio}
-                  index={index}
-                />
-              ))}
+              {grupos.map((group, gi) =>
+                group.grupo && group.ejercicios.length > 1 ? (
+                  // Superserie: ejercicios enmarcados bajo una etiqueta "Superserie A".
+                  <div
+                    key={`g-${gi}`}
+                    className="rounded-lg border border-accent/30 bg-accent/5 p-2"
+                  >
+                    <p className="mb-1.5 flex items-center gap-1.5 px-1 font-mono-metrics text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                      <Repeat size={12} strokeWidth={2} />
+                      {t('superset', { grupo: group.grupo })}
+                    </p>
+                    <div className="space-y-1.5">
+                      {group.ejercicios.map((ejercicio, i) => (
+                        <ExerciseRow key={i} ejercicio={ejercicio} index={group.start + i} />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <ExerciseRow
+                    key={`s-${gi}`}
+                    ejercicio={group.ejercicios[0]}
+                    index={group.start}
+                  />
+                )
+              )}
 
               {/* CTA para entrar a "En el Ruedo" y ejecutar este día. */}
               <Link

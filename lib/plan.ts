@@ -26,6 +26,10 @@ const EjercicioSchema = z.object({
   rpe_objetivo: z.number().int().min(1).max(10).optional(),
   descanso_seg: z.number().int().min(0).optional(),
   notas_kai: z.string().optional(),
+  // Superserie: ejercicios consecutivos con el mismo valor (una letra: "A",
+  // "B"...) se ejecutan en ronda (A1→A2→...). Ausente = ejercicio individual.
+  // Opcional y retrocompatible: los planes sin este campo siguen siendo válidos.
+  grupo: z.string().max(3).optional(),
 });
 
 const DiaSchema = z.object({
@@ -125,13 +129,14 @@ async function generateAndValidatePlan(
           "peso_sugerido_kg": 40,
           "rpe_objetivo": 8,
           "descanso_seg": 90,
-          "notas_kai": "<notas técnicas o de ejecución>"
+          "notas_kai": "<notas técnicas o de ejecución>",
+          "grupo": "A"
         }
       ]
     }
   ]
 }
-Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de wger.de.`;
+Restricciones: sets entre 1 y 10; rpe_objetivo entre 1 y 10; usa IDs reales de wger.de. El campo "grupo" es OPCIONAL (omítelo en ejercicios individuales); úsalo solo para superseries (ver regla 8).`;
 
   // Semilla de variación: se genera una por cada llamada (cada "Regenerar").
   // Cumple dos funciones:
@@ -266,7 +271,27 @@ function extractJsonObject(raw: string): unknown {
  *  5. Generar el plan con reintentos/backoff + validación Zod.
  *  6. Guardar en BD y archivar planes anteriores activos.
  */
-export async function generatePlanForUser(userId: string): Promise<GeneratePlanResult> {
+/**
+ * Contexto de mesociclo para generar UNA semana dentro de un bloque.
+ * Si se pasa, la generación usa la semana_inicio del bloque (no getNextMonday),
+ * inyecta el contexto del bloque en el prompt (semana X/N, arco, deload) y
+ * vincula la fila de weekly_plans al mesociclo.
+ */
+export interface MesocycleContext {
+  mesocycleId: string;
+  nombre: string;
+  objetivo?: string;
+  numSemanas: number;
+  semanaActual: number; // semana que se está generando (1..N)
+  esDeload: boolean;
+  notasBloque?: string;
+  semanaInicio: string; // YYYY-MM-DD, lunes de ESTA semana del bloque
+}
+
+export async function generatePlanForUser(
+  userId: string,
+  mesoCtx?: MesocycleContext
+): Promise<GeneratePlanResult> {
   const supabase = createClient();
 
   // 1. Obtener perfil para validar que onboarding esté completo
@@ -284,8 +309,9 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
     };
   }
 
-  // 2. Calcular lunes de la semana que viene
-  const nextMonday = getNextMonday();
+  // 2. Semana objetivo: la del bloque si venimos de un mesociclo; si no, el
+  //    próximo lunes (semana suelta).
+  const nextMonday = mesoCtx?.semanaInicio ?? getNextMonday();
 
   // (Regenerar es válido: si ya hay un plan para esta semana lo reemplazamos.
   // El borrado se hace MÁS ABAJO, solo cuando ya tenemos un plan nuevo válido,
@@ -303,6 +329,19 @@ export async function generatePlanForUser(userId: string): Promise<GeneratePlanR
   const progresionBlock = progresion
     ? `\n${progresion}\n`
     : '\n(Sin datos de rendimiento de semanas anteriores: primera semana o sin entrenos registrados. Parte de pesos sugeridos normales para su nivel.)\n';
+
+  // 4a-ter. Contexto del bloque (mesociclo) si aplica: semana X de N, arco y si
+  // es semana de descarga. El deload tiene PRIORIDAD sobre la progresión por RPE.
+  const bloqueBlock = mesoCtx
+    ? `\n=== CONTEXTO DEL BLOQUE (MESOCICLO) ===
+Estás generando la SEMANA ${mesoCtx.semanaActual} de ${mesoCtx.numSemanas} del mesociclo "${mesoCtx.nombre}"${mesoCtx.objetivo ? ` (objetivo: ${mesoCtx.objetivo})` : ''}.
+${mesoCtx.notasBloque ? `Arco del bloque: ${mesoCtx.notasBloque}\n` : ''}${
+        mesoCtx.esDeload
+          ? 'ESTA ES LA SEMANA DE DESCARGA (DELOAD): reduce el volumen ~40-50% (menos series y/o ejercicios) y baja la intensidad; prioriza recuperación y técnica. La DESCARGA TIENE PRIORIDAD sobre la progresión por RPE: aunque haya sobrado margen, NO subas cargas esta semana.'
+          : 'Es una semana de ACUMULACIÓN: progresa respecto a la semana anterior según el rendimiento (regla 7).'
+      }
+======================================\n`
+    : '';
 
   // 4b. Cargar el catálogo de ejercicios accesible según el equipamiento del
   // usuario. El LLM elegirá SOLO de esta lista (con wger_id reales), de modo que
@@ -351,7 +390,9 @@ REGLAS CRÍTICAS:
    - "en objetivo" → progresión ligera o mantener.
    - "sin RPE" → progresa con prudencia según si completó las series y reps planeadas.
    Explica brevemente en "notas_kai" el ajuste que hiciste respecto a la semana pasada. Si NO hay datos de rendimiento, parte de pesos sugeridos normales para su nivel.
+8. SUPERSERIES (opcional): puedes agrupar 2-3 ejercicios CONSECUTIVOS en una superserie poniéndoles el mismo valor en "grupo" (una letra: "A", "B"...). El "grupo" es de SUPERSERIE, no tiene nada que ver con el grupo muscular del catálogo. Úsalo solo cuando aporte (antagonistas, eficiencia de tiempo); el "descanso_seg" de esos ejercicios se entiende TRAS completar la ronda del grupo. La mayoría de ejercicios deben ir SUELTOS (sin "grupo"). No abuses.
 
+${bloqueBlock}
 ${context}
 ${progresionBlock}
 === CATÁLOGO DE EJERCICIOS DISPONIBLES (formato: wger_id | nombre | grupo muscular) ===
@@ -385,10 +426,16 @@ Idioma del usuario: ${locale}. Genera todo el plan en ese idioma.`;
     .from('weekly_plans')
     .insert({
       user_id: userId,
-      semana_inicio: validPlan.semana_inicio,
+      // Forzamos NUESTRA fecha (no la que eche el modelo) para garantizar el
+      // lunes correcto, sobre todo en semanas de un bloque.
+      semana_inicio: nextMonday,
       estado: 'active',
       plan_json: validPlan,
       notas_bloque: validPlan.notas_bloque || null,
+      // Vínculo al mesociclo si esta semana pertenece a un bloque.
+      mesocycle_id: mesoCtx?.mesocycleId ?? null,
+      semana_indice: mesoCtx?.semanaActual ?? null,
+      es_deload: mesoCtx?.esDeload ?? false,
     })
     .select()
     .single();

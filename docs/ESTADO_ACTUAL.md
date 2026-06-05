@@ -1,22 +1,36 @@
-# ESTADO ACTUAL — Kinética (Handoff técnico, 28 May 2026)
+# ESTADO ACTUAL — Kinética (Handoff técnico, 3 Jun 2026)
 
-> Documento para el próximo agente que retome el proyecto. Lee `TODO.md` primero (estado funcional resumido) y luego este (detalles técnicos y reproducción del bug activo).
+> Documento para el próximo agente que retome el proyecto. Lee `TODO.md` primero (estado funcional resumido) y luego este (detalles técnicos).
 
 ---
 
 ## TL;DR
 
-- El proyecto está **funcional en su mayor parte**: auth, chat de Kai sin bucle, onboarding determinístico, generación de plan con ejercicios reales de wger.de validados.
-- **El bug de "regenerar no cambiaba el plan" está CERRADO** (ver sección abajo). La causa era backend (petición al LLM idéntica entre regeneraciones), no UI/SW como suponía el handoff anterior.
-- **Features añadidas en esta sesión** (todas en `develop`, pusheadas): "En el Ruedo" (ejecución del entreno → `workout_logs`), gráficas de progreso en el Dashboard (Recharts + `lib/progress.ts`), y tools de Kai (`query_progress_summary`, `register_injury`, `resolve_injury`). Además se configuró ESLint.
-- **Git**: `develop` está al día y pusheado; no hay ramas de feature abiertas. `main` sigue en una versión anterior (pendiente release `develop` → `main`).
-- Producción: https://kinetica-delta.vercel.app · Supabase: `focbdmounzgaujtirvno`. **Ojo: producción despliega de `main`, así que lo nuevo de esta sesión aún NO está en producción** hasta que se haga el release.
+- El proyecto está **funcional**: auth, chat de Kai sin bucle, onboarding determinístico, generación de plan con ejercicios reales de wger.de, "En el Ruedo", progreso y temas seleccionables.
+- **Sesión del 3 Jun (esta): loop de progresión por RPE + récords por ejercicio + biometría manual. TODO está en producción** (release `c877c8a` en `main`). Detalle abajo.
+- **Git**: `main` y `develop` al día y pusheados. Producción despliega de `main` (verificado: el deploy de `c877c8a` salió con `target: production`). Rama abierta sin mergear: **`feature/exercise-videos`** (vídeos YouTube, dormido hasta `YOUTUBE_API_KEY`).
+- Producción: https://kinetica-delta.vercel.app · Supabase: `focbdmounzgaujtirvno`.
+- **A vigilar**: la progresión por RPE delega la decisión en el LLM (Haiku) — verificar en uso real que aplica los ajustes de carga con consistencia (red de seguridad determinística preparable en `lib/progression.ts`). Récords y biometría son recién estrenados en navegador.
 
 ---
 
-## Lo que se logró en la sesión anterior (cronológico)
+## Sesión del 3 Jun 2026 (esta)
 
-Esta sesión empezó con un proyecto heredado de otro agente que dejó múltiples bugs críticos. Se resolvieron:
+1. **Loop de progresión por RPE** (rama `feature/progression-loop`, mergeada y borrada):
+   - **Pieza A — captura**: `SerieRegistro.rpe?` + selector "Esfuerzo: Fácil/Justo/Duro" (→ RPE 6/8/10) en `exercise-tracker.tsx`, aparece al completar la serie. Se guarda en `workout_logs.sets` (jsonb), sin migración. Validado en `app/api/workout/log/route.ts`.
+   - **Pieza B — cerebro**: `lib/progression.ts` (`buildProgressionSummary` pura + `getProgressionSummary` con BD + `progressionSignal`) resume plan-vs-realidad de la semana en curso. `lib/plan.ts` inyecta ese resumen + la "regla 7" de progresión en el system prompt. Tests en `tests/progression.test.ts` (13).
+2. **Récords e historial por ejercicio** (subagente en worktree, cherry-pick): `lib/records.ts`, `app/api/progress/records`, `components/progress/exercise-records.tsx`, página `/progress`. e1RM Epley, PRs. Tests (13).
+3. **Biometría manual** (subagente en worktree, cherry-pick): `lib/biometrics.ts` + `lib/biometrics-server.ts`, `app/api/biometrics`, `components/biometrics/*`, página `/biometrics`. `biometrics_history` ya existía (sin migración). Tests (12).
+4. **Coherencia de nav**: nav a 3 (Inicio/Plan/Coach); Cuerpo y Récords como cards del dashboard (`dashboard-view.tsx`).
+5. **Decisión de catálogo**: se evaluó ExerciseDB API y se descartó (de pago/RapidAPI, sin self-host, licencia de media no declarada). Seguimos con wger + YouTube para demos.
+
+> **Nota de método**: las features 2 y 3 se construyeron con dos subagentes en paralelo, cada uno en un git worktree aislado con footprints disjuntos, e integradas por cherry-pick (los i18n en namespaces separados auto-mergearon limpio). Patrón a repetir cuando las features no comparten archivos.
+
+---
+
+## Sesiones anteriores (cronológico)
+
+La primera sesión empezó con un proyecto heredado de otro agente que dejó múltiples bugs críticos. Se resolvieron:
 
 1. **Auditoría profunda** (5 dominios en paralelo: chat, plan, auth, schema, frontend). Hallazgos consolidados y priorizados.
 2. **Chat de Kai sin bucle de onboarding**:
@@ -81,22 +95,29 @@ app/
 │   │   ├── generate/route.ts  # POST: delega en generatePlanForUser
 │   │   └── active/route.ts    # GET: plan activo del usuario
 │   ├── workout/
-│   │   └── log/route.ts       # POST: persiste el entreno ejecutado (workout_logs)
+│   │   └── log/route.ts       # POST: persiste el entreno ejecutado (workout_logs, con rpe en sets)
+│   ├── progress/records/route.ts # GET: récords + historial por ejercicio
+│   ├── biometrics/route.ts    # POST/GET: pesaje manual (biometrics_history)
 │   └── admin/
 │       └── sync-exercises/route.ts  # POST protegido con SYNC_SECRET
 ├── actions/auth.ts             # signUp/signIn/signOut (devuelven redirectTo, no redirect())
 └── [locale]/                   # i18n routing (next-intl, localePrefix 'always')
     ├── (auth)/login, register
-    ├── (dashboard)/dashboard, plan, coach, ruedo/[dia]
+    ├── (dashboard)/dashboard, plan, coach, ruedo/[dia], progress, biometrics
     └── disclaimer/             # server component con guard
 
 lib/
-├── plan.ts                     # ⭐ generación de plan (Zod, retries, catálogo wger, nonce de variación)
+├── plan.ts                     # ⭐ generación de plan (Zod, retries, catálogo wger, nonce, regla de progresión)
+├── progression.ts              # ⭐ resumen plan-vs-realidad + señal RPE (puro + wrapper BD). Alimenta plan.ts
+├── records.ts                  # récords/historial por ejercicio (e1RM Epley, PRs) — puro + wrapper
+├── biometrics.ts               # puro: computeIMC, summarizeWeightTrend
+├── biometrics-server.ts        # wrapper BD: getBiometricsHistory
 ├── wger.ts                     # ⭐ cliente wger + sync + getCatalogForUser
-├── workout.ts                  # tipos + helpers de "En el Ruedo" (parseReps, getFechaForDia)
+├── youtube.ts                  # cache-first de vídeos (rama feature/exercise-videos)
+├── workout.ts                  # tipos + helpers de "En el Ruedo" (SerieRegistro.rpe, RPE_NIVELES, parseReps)
 ├── progress.ts                 # agregación de workout_logs + formatProgressSummary (con tests)
-├── tools.ts                    # tools de Kai (update_user_profile, generate_weekly_plan, query_progress_summary, register_injury, resolve_injury)
-├── memory.ts                   # 3 capas de memoria para Kai
+├── tools.ts                    # tools de Kai (update_user_profile, generate_weekly_plan, query_progress_summary, register/resolve_injury)
+├── memory.ts                   # 3 capas de memoria (lee biometrics_history/health_metrics → Kai ve pesajes)
 ├── onboarding.ts               # isOnboardingDataComplete (determinístico)
 ├── auth.ts                     # requireUser
 └── supabase/
@@ -107,10 +128,12 @@ lib/
 components/
 ├── chat/coach-chat.tsx, use-chat-stream.ts, chat-message.tsx, markdown-renderer.tsx
 ├── plan/weekly-plan-view.tsx   # vista del plan + botón "Entrenar"
-├── ruedo/ruedo-view.tsx, exercise-tracker.tsx, rest-timer.tsx  # "En el Ruedo"
-├── dashboard/progress-charts.tsx  # gráficas de progreso (Recharts)
-├── auth/login-form, register-form, user-menu
-└── bottom-nav.tsx, service-worker-register.tsx
+├── ruedo/ruedo-view.tsx, exercise-tracker.tsx (con selector RPE), rest-timer.tsx
+├── progress/exercise-records.tsx  # récords + evolución por ejercicio (Recharts)
+├── biometrics/biometrics-view.tsx, weigh-in-form.tsx, weight-chart.tsx
+├── dashboard/dashboard-view.tsx (cards Cuerpo/Récords), dashboard-redline/kinetic, progress-charts.tsx
+├── nav/nav-config.ts, sidebar.tsx · bottom-nav.tsx
+└── auth/login-form, register-form, user-menu
 ```
 
 ## Comandos útiles
@@ -159,10 +182,6 @@ En `lib/wger.ts: EQUIPMENT_MAP` y `SIN_FILTRO`. Resumen:
 
 ## Memoria entre sesiones (auto-memory)
 
-Si tienes acceso al sistema de auto-memory del usuario (ruta local `C:\Users\dealm\.claude-kluge\projects\C--00-CARLOS-C-02-CikeTheBear-kinetica\memory\`), hay 3 memorias clave:
+Si tienes acceso al auto-memory del usuario (ruta `C:\Users\dealm\.claude\projects\C--00-CARLOS-C-02-CikeTheBear-kinetica\memory\`, índice en `MEMORY.md`), úsalo. Nota clave registrada: **producción despliega de `main`** (no `master`); si no se ven cambios en prod, revisar la Production Branch en Vercel.
 
-- `project_handoff.md`: el proyecto vino de otro agente que no funcionaba.
-- `feedback_onboarding_conversacional.md`: el onboarding debe ser chat natural con Kai, NO wizard.
-- `feedback_git_workflow.md`: main/develop/feature flow.
-
-Si NO tienes acceso (cuenta distinta de Claude), todo el contexto crítico está en este archivo y en `TODO.md`.
+Las preferencias críticas de Carlos (onboarding conversacional NO wizard, git workflow main/develop/feature, no commits ni push sin permiso) viven también en `CLAUDE.md`. Si NO tienes acceso a la memoria, todo el contexto crítico está en este archivo, `TODO.md` y `CLAUDE.md`.

@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Repeat } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/navigation';
 import { PageContainer } from '@/components/page-container';
 import {
   parseRepsObjetivo,
+  groupBySuperset,
   type EjercicioRegistro,
   type SerieRegistro,
 } from '@/lib/workout';
@@ -24,6 +25,7 @@ interface EjercicioPlan {
   rpe_objetivo?: number;
   descanso_seg?: number;
   notas_kai?: string;
+  grupo?: string;
 }
 
 interface DiaPlan {
@@ -188,6 +190,37 @@ export function RuedoView({
     );
   }
 
+  // Agrupar para el render por superserie. Zip del estado con el plan (de donde
+  // sale `grupo`), preservando el índice original — que es la clave que usan
+  // updateSerie/toggleComplete. El registro y el descanso NO cambian (v1 display):
+  // solo enmarcamos visualmente los ejercicios de una misma superserie.
+  const grupos = groupBySuperset(
+    ejercicios.map((ej, index) => ({
+      wger_id: ej.wger_id,
+      index,
+      grupo: dia.ejercicios[index]?.grupo,
+    }))
+  );
+
+  function renderTracker(ejIndex: number, key?: string) {
+    const ej = ejercicios[ejIndex];
+    const plan = dia.ejercicios[ejIndex];
+    return (
+      <ExerciseTracker
+        key={key ?? ej.wger_id}
+        ejercicio={ej}
+        target={{
+          reps_objetivo: plan.reps_objetivo,
+          peso_sugerido_kg: plan.peso_sugerido_kg,
+          rpe_objetivo: plan.rpe_objetivo,
+          notas_kai: plan.notas_kai,
+        }}
+        onChangeSerie={(serieIndex, patch) => updateSerie(ejIndex, serieIndex, patch)}
+        onToggleComplete={(serieIndex) => toggleComplete(ejIndex, serieIndex)}
+      />
+    );
+  }
+
   return (
     <PageContainer>
       {/* Cabecera */}
@@ -212,24 +245,24 @@ export function RuedoView({
         </div>
       </div>
 
-      {/* Ejercicios */}
+      {/* Ejercicios (agrupados por superserie cuando el plan lo indica) */}
       <div className="space-y-3">
-        {ejercicios.map((ej, ejIndex) => (
-          <ExerciseTracker
-            key={ej.wger_id}
-            ejercicio={ej}
-            target={{
-              reps_objetivo: dia.ejercicios[ejIndex].reps_objetivo,
-              peso_sugerido_kg: dia.ejercicios[ejIndex].peso_sugerido_kg,
-              rpe_objetivo: dia.ejercicios[ejIndex].rpe_objetivo,
-              notas_kai: dia.ejercicios[ejIndex].notas_kai,
-            }}
-            onChangeSerie={(serieIndex, patch) =>
-              updateSerie(ejIndex, serieIndex, patch)
-            }
-            onToggleComplete={(serieIndex) => toggleComplete(ejIndex, serieIndex)}
-          />
-        ))}
+        {grupos.map((group, gi) =>
+          group.grupo && group.ejercicios.length > 1 ? (
+            <div
+              key={`g-${gi}`}
+              className="space-y-2 rounded-2xl border border-accent/30 bg-accent/5 p-2"
+            >
+              <p className="flex items-center gap-1.5 px-1 pt-1 font-mono-metrics text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+                <Repeat size={12} strokeWidth={2} />
+                {t('superset', { grupo: group.grupo })}
+              </p>
+              {group.ejercicios.map((item) => renderTracker(item.index))}
+            </div>
+          ) : (
+            renderTracker(group.ejercicios[0].index, `s-${gi}`)
+          )
+        )}
       </div>
 
       {/* Finalizar */}
