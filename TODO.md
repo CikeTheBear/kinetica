@@ -1,4 +1,4 @@
-# TODO — Kinética (Estado REAL al 3 Jun 2026)
+# TODO — Kinética (Estado REAL al 5 Jun 2026)
 
 > Estado real del proyecto al cierre de la sesión con Vertex (Claude). Léelo entero antes de tocar nada — explica qué funciona, qué está roto y por dónde seguir.
 > ✅ Funciona · 🐛 Roto · ⏳ No implementado · ⚠️ Parcial / temporalmente desactivado
@@ -11,7 +11,7 @@
 ## Estado de Git (al cierre)
 
 - Ramas: `main` (principal/versiones, **rama de producción en Vercel**), `develop` (desarrollo), features salen de `develop`.
-- **`main` y `develop` están al día y pusheados.** El release `c877c8a` ya está **en producción**: incluye el loop RPE→progresión, récords por ejercicio y biometría manual.
+- **`main` y `develop` están al día y pusheados.** Último release en producción `3039f7d` (plan-model v2): superseries + mesociclos. El release previo `c877c8a` añadió loop RPE→progresión, récords por ejercicio y biometría manual. **Migración `003_mesocycles.sql` ya aplicada en Supabase.**
 - **Rama abierta sin mergear: `feature/exercise-videos`** — vídeos demostrativos de ejercicios (YouTube, cache-first). Código completo y validado, pero **dormido hasta que se configure `YOUTUBE_API_KEY`** (sin la key el botón "Ver técnica" muestra "no disponible", no rompe). Falta: meter la key en `.env.local` + Vercel, probar y mergear.
 - Modelo LLM en uso: `anthropic/claude-haiku-4.5` (env var `OPENROUTER_DEFAULT_MODEL`).
 
@@ -56,9 +56,19 @@
 - [x] IMC calculado en el POST desde `metadata_biometrica.altura_cm` cuando existe.
 - [x] `lib/biometrics.ts` (puro: `computeIMC`, `summarizeWeightTrend`) + `lib/biometrics-server.ts` (query) + `app/api/biometrics` (POST/GET) + gráfico de evolución del peso. Enlazado desde card del dashboard.
 
+### Superseries (plan-model v2 · Fase 1)
+- [x] Campo opcional `grupo` en cada ejercicio del `plan_json` (retrocompatible): ejercicios consecutivos con la misma letra = superserie. Regla 8 del prompt para que Kai las use con criterio.
+- [x] Helper puro `groupBySuperset` (`lib/workout.ts`, tests). Render enmarcado "Superserie A" en Plan y Ruedo. **v1 = display**: el registro y el descanso del Ruedo NO cambian (la ejecución intercalada A1→A2→descanso es v2, pendiente).
+
+### Mesociclos (plan-model v2 · Fase 2)
+- [x] Bloques **opt-in** de N semanas (tabla `mesocycles` + columnas `mesocycle_id`/`semana_indice`/`es_deload` en `weekly_plans`, migración 003 aplicada). La semana sigue siendo la unidad atómica; el mesociclo la orquesta.
+- [x] `lib/mesocycle.ts`: `startMesocycle` (crea bloque + genera semana 1), `advanceMesocycleWeek` (materializa la siguiente con el RPE real de la anterior + contexto del bloque), `regenerateCurrentMesocycleWeek`. Última semana = **deload** (prioridad sobre el RPE).
+- [x] `generatePlanForUser` acepta `MesocycleContext` opcional (override de `semana_inicio`, bloque en el prompt, vínculo en el insert). Rutas `/api/mesocycle` (GET activo, POST start) y `/api/mesocycle/week` (advance/regenerate).
+- [x] UI en el Plan: badge "Semana X/N", chip de descarga, form para empezar bloque, "Siguiente semana" y "Regenerar" block-aware. Cae a semana suelta si no hay bloque.
+
 ### Backend / Infra / Tests
 - [x] Supabase (`focbdmounzgaujtirvno`) con RLS en todas las tablas.
-- [x] **Tests vitest: 58 casos en verde** — onboarding (11), progreso (9), progresión (13), récords (13), biometría (12).
+- [x] **Tests vitest: 72 casos en verde** — onboarding (11), progreso (9), progresión (13), récords (13), biometría (12), superseries (7), mesociclos (7).
 - [x] ESLint + typecheck limpios. Build de producción OK.
 
 ---
@@ -73,6 +83,7 @@ La petición al LLM era **byte-idéntica** entre regeneraciones (`temperature: 0
 
 - **Progresión por RPE**: el cerebro de la progresión vive en el LLM (Haiku), guiado por la señal + la regla del prompt — NO en reglas determinísticas. **Hay que comprobar entrenando de verdad que Haiku aplica los ajustes de carga de forma consistente.** Si se despista, el sitio para meter una red de seguridad determinística ya está preparado en `lib/progression.ts` (la señal se calcula aparte del prompt).
 - **Features A/B (récords, biometría)**: construidas por subagentes en paralelo, validadas por build/tests pero recién estrenadas en navegador. Revisar en producción.
+- **Superseries y mesociclos**: validados por build/tests pero **sin probar en navegador todavía** (se desplegaron directo a prod). Flujo clave a verificar: empezar bloque → entrenar con RPE → Siguiente semana (ajusta cargas) → semana de descarga. Y que Kai meta alguna superserie.
 
 ---
 
@@ -87,9 +98,9 @@ La petición al LLM era **byte-idéntica** entre regeneraciones (`temperature: 0
 
 ## ⏳ NO IMPLEMENTADO (próximos sprints)
 
-**En cola, requieren diseño antes de codear (ambas tocan el schema de `plan_json`):**
-- [ ] **Supersets / circuitos**: agrupar ejercicios en "slots" (superseries/biseries) en el plan + UI del Ruedo. La acotada de las dos.
-- [ ] **Mesociclos / periodización**: plan de N semanas con arco de progresión + deload, no una semana suelta. El salto grande; el motor de RPE actual sería el engine dentro del bloque. Diseñar con Carlos.
+**Plan-model v2 — seguimiento (lo grande ya está en prod):**
+- [ ] **Superseries v2**: ejecución intercalada real en el Ruedo (A1→A2→descanso TRAS la ronda, timer por grupo). La v1 (display) ya está.
+- [ ] **Mesociclos — pulido**: que Kai diseñe el arco del bloque (ahora es plantilla determinística), cerrar/completar el bloque al terminar la última semana, y una vista de historial de bloques.
 
 **Resto del backlog:**
 - [ ] Tool `modify_current_plan` de Kai (mutar el `plan_json` ejercicio a ejercicio + revalidar `wger_id`; la más delicada).

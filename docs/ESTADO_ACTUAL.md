@@ -1,4 +1,4 @@
-# ESTADO ACTUAL — Kinética (Handoff técnico, 3 Jun 2026)
+# ESTADO ACTUAL — Kinética (Handoff técnico, 5 Jun 2026)
 
 > Documento para el próximo agente que retome el proyecto. Lee `TODO.md` primero (estado funcional resumido) y luego este (detalles técnicos).
 
@@ -7,14 +7,14 @@
 ## TL;DR
 
 - El proyecto está **funcional**: auth, chat de Kai sin bucle, onboarding determinístico, generación de plan con ejercicios reales de wger.de, "En el Ruedo", progreso y temas seleccionables.
-- **Sesión del 3 Jun (esta): loop de progresión por RPE + récords por ejercicio + biometría manual. TODO está en producción** (release `c877c8a` en `main`). Detalle abajo.
-- **Git**: `main` y `develop` al día y pusheados. Producción despliega de `main` (verificado: el deploy de `c877c8a` salió con `target: production`). Rama abierta sin mergear: **`feature/exercise-videos`** (vídeos YouTube, dormido hasta `YOUTUBE_API_KEY`).
+- **Sesión 3-5 Jun (esta): loop de progresión por RPE + récords + biometría manual + plan-model v2 (superseries y mesociclos). TODO está en producción.** Último release `3039f7d` (superseries + mesociclos); previo `c877c8a` (RPE/récords/biometría). Detalle abajo.
+- **Git**: `main` y `develop` al día y pusheados. Producción despliega de `main` (verificado: deploys salen con `target: production`). **Migración `003_mesocycles.sql` aplicada en Supabase.** Rama abierta sin mergear: **`feature/exercise-videos`** (vídeos YouTube, dormido hasta `YOUTUBE_API_KEY`).
 - Producción: https://kinetica-delta.vercel.app · Supabase: `focbdmounzgaujtirvno`.
-- **A vigilar**: la progresión por RPE delega la decisión en el LLM (Haiku) — verificar en uso real que aplica los ajustes de carga con consistencia (red de seguridad determinística preparable en `lib/progression.ts`). Récords y biometría son recién estrenados en navegador.
+- **A vigilar**: (1) la progresión por RPE delega la decisión en el LLM (Haiku) — verificar en uso real que aplica los ajustes con consistencia (red de seguridad determinística preparable en `lib/progression.ts`). (2) Récords, biometría, superseries y mesociclos están en prod pero **sin probar en navegador** todavía.
 
 ---
 
-## Sesión del 3 Jun 2026 (esta)
+## Sesión del 3-5 Jun 2026 (esta)
 
 1. **Loop de progresión por RPE** (rama `feature/progression-loop`, mergeada y borrada):
    - **Pieza A — captura**: `SerieRegistro.rpe?` + selector "Esfuerzo: Fácil/Justo/Duro" (→ RPE 6/8/10) en `exercise-tracker.tsx`, aparece al completar la serie. Se guarda en `workout_logs.sets` (jsonb), sin migración. Validado en `app/api/workout/log/route.ts`.
@@ -23,8 +23,10 @@
 3. **Biometría manual** (subagente en worktree, cherry-pick): `lib/biometrics.ts` + `lib/biometrics-server.ts`, `app/api/biometrics`, `components/biometrics/*`, página `/biometrics`. `biometrics_history` ya existía (sin migración). Tests (12).
 4. **Coherencia de nav**: nav a 3 (Inicio/Plan/Coach); Cuerpo y Récords como cards del dashboard (`dashboard-view.tsx`).
 5. **Decisión de catálogo**: se evaluó ExerciseDB API y se descartó (de pago/RapidAPI, sin self-host, licencia de media no declarada). Seguimos con wger + YouTube para demos.
+6. **Superseries v1** (plan-model v2, Fase 1): campo `grupo` en el `plan_json` + helper `groupBySuperset` (`lib/workout.ts`) + render enmarcado en Plan y Ruedo. v1 = display; la ejecución intercalada es v2.
+7. **Mesociclos v1** (plan-model v2, Fase 2): tabla `mesocycles` + columnas en `weekly_plans` (migración 003), `lib/mesocycle.ts` (start/advance/regenerate, deload en la última semana), `MesocycleContext` en `generatePlanForUser`, rutas `/api/mesocycle*`, UI de bloque en el Plan. Cada semana se materializa al avanzar con el RPE real de la anterior.
 
-> **Nota de método**: las features 2 y 3 se construyeron con dos subagentes en paralelo, cada uno en un git worktree aislado con footprints disjuntos, e integradas por cherry-pick (los i18n en namespaces separados auto-mergearon limpio). Patrón a repetir cuando las features no comparten archivos.
+> **Nota de método**: récords y biometría (2 y 3) se construyeron con dos subagentes en paralelo en worktrees aislados (footprints disjuntos), integradas por cherry-pick — patrón a repetir cuando las features no comparten archivos. Superseries y mesociclos (6 y 7) se hicieron secuenciales porque ambas tocan `lib/plan.ts`/el schema del plan (mesociclos apilada sobre superseries para evitar conflictos).
 
 ---
 
@@ -98,6 +100,8 @@ app/
 │   │   └── log/route.ts       # POST: persiste el entreno ejecutado (workout_logs, con rpe en sets)
 │   ├── progress/records/route.ts # GET: récords + historial por ejercicio
 │   ├── biometrics/route.ts    # POST/GET: pesaje manual (biometrics_history)
+│   ├── mesocycle/route.ts     # GET (bloque activo) / POST (empezar bloque)
+│   ├── mesocycle/week/route.ts # POST { action: advance | regenerate }
 │   └── admin/
 │       └── sync-exercises/route.ts  # POST protegido con SYNC_SECRET
 ├── actions/auth.ts             # signUp/signIn/signOut (devuelven redirectTo, no redirect())
@@ -107,14 +111,15 @@ app/
     └── disclaimer/             # server component con guard
 
 lib/
-├── plan.ts                     # ⭐ generación de plan (Zod, retries, catálogo wger, nonce, regla de progresión)
+├── plan.ts                     # ⭐ generación de plan (Zod, retries, catálogo wger, nonce, progresión, MesocycleContext)
 ├── progression.ts              # ⭐ resumen plan-vs-realidad + señal RPE (puro + wrapper BD). Alimenta plan.ts
+├── mesocycle.ts                # ⭐ orquesta bloques: start/advance/regenerate + deload. Llama a generatePlanForUser
 ├── records.ts                  # récords/historial por ejercicio (e1RM Epley, PRs) — puro + wrapper
 ├── biometrics.ts               # puro: computeIMC, summarizeWeightTrend
 ├── biometrics-server.ts        # wrapper BD: getBiometricsHistory
 ├── wger.ts                     # ⭐ cliente wger + sync + getCatalogForUser
 ├── youtube.ts                  # cache-first de vídeos (rama feature/exercise-videos)
-├── workout.ts                  # tipos + helpers de "En el Ruedo" (SerieRegistro.rpe, RPE_NIVELES, parseReps)
+├── workout.ts                  # tipos + helpers de "En el Ruedo" (SerieRegistro.rpe, RPE_NIVELES, parseReps, groupBySuperset)
 ├── progress.ts                 # agregación de workout_logs + formatProgressSummary (con tests)
 ├── tools.ts                    # tools de Kai (update_user_profile, generate_weekly_plan, query_progress_summary, register/resolve_injury)
 ├── memory.ts                   # 3 capas de memoria (lee biometrics_history/health_metrics → Kai ve pesajes)
