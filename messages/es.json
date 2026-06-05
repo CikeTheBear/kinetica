@@ -76,7 +76,14 @@
     "weekOf": "Semana del",
     "errorGenerating": "No se pudo generar el plan. Inténtalo de nuevo.",
     "trainButton": "Entrenar",
-    "superset": "Superserie {grupo}"
+    "superset": "Superserie {grupo}",
+    "blockWeek": "Semana {semana}/{total}",
+    "deload": "Descarga",
+    "startBlock": "Empezar bloque",
+    "nextWeek": "Siguiente semana",
+    "blockWeeks": "Semanas",
+    "blockObjectivePlaceholder": "Objetivo del bloque (opcional): p. ej. hipertrofia",
+    "starting": "Empezando..."
   },
   "ruedo": {
     "backToPlan": "Volver al plan",

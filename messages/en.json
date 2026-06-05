@@ -76,7 +76,14 @@
     "weekOf": "Week of",
     "errorGenerating": "Couldn't generate the plan. Please try again.",
     "trainButton": "Train",
-    "superset": "Superset {grupo}"
+    "superset": "Superset {grupo}",
+    "blockWeek": "Week {semana}/{total}",
+    "deload": "Deload",
+    "startBlock": "Start block",
+    "nextWeek": "Next week",
+    "blockWeeks": "Weeks",
+    "blockObjectivePlaceholder": "Block goal (optional): e.g. hypertrophy",
+    "starting": "Starting..."
   },
   "ruedo": {
     "backToPlan": "Back to plan",
